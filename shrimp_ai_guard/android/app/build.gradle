@@ -20,8 +20,9 @@ android {
 
     defaultConfig {
         applicationId = "com.example.shrimp_ai_guard"
-        minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        // Explicitly set SDK versions for better compatibility
+        minSdk = 21
+        targetSdk = 34
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
