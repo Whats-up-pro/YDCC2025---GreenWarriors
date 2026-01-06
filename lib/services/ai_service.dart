@@ -138,12 +138,17 @@ class AIService {
       int pixelIndex = 0;
       for (int y = 0; y < INPUT_SIZE; y++) {
         for (int x = 0; x < INPUT_SIZE; x++) {
-          final pixel = resizedImage.getPixel(x, y);
+          final pixel = resizedImage.getPixelSafe(x, y);
           
           // Normalize RGB values from 0-255 to 0.0-1.0
-          input[pixelIndex++] = pixel.r / 255.0;
-          input[pixelIndex++] = pixel.g / 255.0;
-          input[pixelIndex++] = pixel.b / 255.0;
+          // Access properties once and store in local variables for efficiency
+          final r = pixel.r;
+          final g = pixel.g;
+          final b = pixel.b;
+          
+          input[pixelIndex++] = r / 255.0;
+          input[pixelIndex++] = g / 255.0;
+          input[pixelIndex++] = b / 255.0;
         }
       }
       
