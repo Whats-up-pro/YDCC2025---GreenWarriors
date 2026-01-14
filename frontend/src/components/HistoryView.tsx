@@ -129,18 +129,18 @@ export const HistoryView = () => {
             </div>
 
             {/* Statistics */}
-            <div className="grid grid-cols-3 gap-2 mb-6">
-                <div className="card p-3 text-center">
-                    <p className="text-2xl font-bold text-[var(--color-text)]">{stats.total}</p>
-                    <p className="text-xs text-[var(--color-text-secondary)]">Tổng</p>
+            <div className="grid grid-cols-3 gap-2 lg:gap-4 mb-6">
+                <div className="card p-3 lg:p-6 text-center">
+                    <p className="text-2xl lg:text-4xl font-bold text-[var(--color-text)]">{stats.total}</p>
+                    <p className="text-xs lg:text-sm text-[var(--color-text-secondary)] mt-1">Tổng</p>
                 </div>
-                <div className="card p-3 text-center bg-green-50">
-                    <p className="text-2xl font-bold text-green-600">{stats.healthy}</p>
-                    <p className="text-xs text-green-700">Khỏe</p>
+                <div className="card p-3 lg:p-6 text-center bg-green-50">
+                    <p className="text-2xl lg:text-4xl font-bold text-green-600">{stats.healthy}</p>
+                    <p className="text-xs lg:text-sm text-green-700 mt-1">Khỏe</p>
                 </div>
-                <div className="card p-3 text-center bg-red-50">
-                    <p className="text-2xl font-bold text-red-600">{stats.wsd}</p>
-                    <p className="text-xs text-red-700">Bệnh</p>
+                <div className="card p-3 lg:p-6 text-center bg-red-50">
+                    <p className="text-2xl lg:text-4xl font-bold text-red-600">{stats.wsd}</p>
+                    <p className="text-xs lg:text-sm text-red-700 mt-1">Bệnh</p>
                 </div>
             </div>
 
@@ -153,31 +153,32 @@ export const HistoryView = () => {
                     </p>
                 </div>
             ) : (
-                <div className="space-y-2">
-                    <h3 className="text-sm font-medium text-[var(--color-text-secondary)] mb-3">
+                <div>
+                    <h3 className="text-sm lg:text-base font-medium text-[var(--color-text-secondary)] mb-3">
                         Lịch sử gần đây
                     </h3>
+                    <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
                     {records.map((record) => {
                         const thumbnailUrl = record.id ? thumbnailUrls.get(record.id) : undefined;
                         
                         return (
                             <div
                                 key={record.id}
-                                className="card p-3 flex items-center gap-3"
+                                className="card p-3 lg:p-4 flex items-center gap-3 lg:gap-4"
                             >
                                 {thumbnailUrl ? (
                                     <img
                                         src={thumbnailUrl}
                                         alt={`Ảnh phát hiện ${record.label}`}
-                                        className="w-14 h-14 object-cover border border-[var(--color-border)]"
+                                        className="w-14 h-14 lg:w-20 lg:h-20 object-cover border border-[var(--color-border)]"
                                         style={{ borderRadius: '12px' }} /* iOS 12px */
                                     />
                                 ) : (
                                     <div 
-                                        className="w-14 h-14 bg-gray-100 flex items-center justify-center border border-[var(--color-border)]"
+                                        className="w-14 h-14 lg:w-20 lg:h-20 bg-gray-100 flex items-center justify-center border border-[var(--color-border)]"
                                         style={{ borderRadius: '12px' }}
                                     >
-                                        <span className="text-2xl">🦐</span>
+                                        <span className="text-2xl lg:text-3xl">🦐</span>
                                     </div>
                                 )}
 
@@ -191,16 +192,17 @@ export const HistoryView = () => {
                                             <span className="badge badge-warning">Chờ đồng bộ</span>
                                         )}
                                     </div>
-                                    <p className="text-sm text-[var(--color-text-secondary)]">
+                                    <p className="text-sm lg:text-base text-[var(--color-text-secondary)]">
                                         {(record.confidence * 100).toFixed(0)}% tin cậy
                                     </p>
-                                    <p className="text-xs text-[var(--color-text-muted)]">
+                                    <p className="text-xs lg:text-sm text-[var(--color-text-muted)]">
                                         {formatDate(new Date(record.timestamp))}
                                     </p>
                                 </div>
                             </div>
                         );
                     })}
+                    </div>
                 </div>
             )}
         </div>

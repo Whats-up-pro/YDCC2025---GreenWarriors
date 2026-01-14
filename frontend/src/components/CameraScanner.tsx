@@ -137,23 +137,23 @@ export const CameraScanner = () => {
 
       {/* Empty State */}
       {!preview && (
-        <div className="py-12 text-center">
-          <div className="mb-6">
+        <div className="py-12 lg:py-20 text-center">
+          <div className="mb-6 lg:mb-8">
             <div
-              className="w-20 h-20 mx-auto mb-4 flex items-center justify-center bg-orange-50 text-[var(--color-shrimp)]"
+              className="w-20 h-20 lg:w-32 lg:h-32 mx-auto mb-4 lg:mb-6 flex items-center justify-center bg-orange-50 text-[var(--color-shrimp)]"
               style={{ borderRadius: '20px' }} /* iOS 20px large icon container */
               role="img"
               aria-label="Biểu tượng máy ảnh"
             >
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true" className="lg:w-16 lg:h-16">
                 <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
                 <circle cx="12" cy="13" r="4" />
               </svg>
             </div>
-            <h2 className="text-lg font-semibold text-[var(--color-text)] mb-1">
+            <h2 className="text-lg lg:text-2xl font-semibold text-[var(--color-text)] mb-1 lg:mb-2">
               Chụp ảnh để chẩn đoán
             </h2>
-            <p className="text-sm text-[var(--color-text-secondary)]">
+            <p className="text-sm lg:text-base text-[var(--color-text-secondary)]">
               Chụp rõ nét vùng nghi ngờ bệnh trên tôm
             </p>
           </div>
@@ -161,7 +161,7 @@ export const CameraScanner = () => {
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={loading}
-            className="btn btn-primary btn-lg w-full sm:w-auto sm:min-w-[200px]"
+            className="btn btn-primary btn-lg w-full sm:w-auto sm:min-w-[200px] lg:min-w-[280px] lg:text-lg"
             aria-label="Mở camera để chụp ảnh tôm"
             aria-busy={loading}
           >
@@ -172,9 +172,9 @@ export const CameraScanner = () => {
 
       {/* Preview and Results */}
       {preview && (
-        <div className="space-y-4">
+        <div className="space-y-4 lg:space-y-6">
           {/* Image */}
-          <div className="relative">
+          <div className="relative lg:max-w-2xl lg:mx-auto">
             <img
               src={preview}
               alt="Ảnh tôm đã chụp để phân tích"
@@ -191,8 +191,8 @@ export const CameraScanner = () => {
               >
                 <div className="text-white text-center">
                   {/* iOS-style loading (pulse, not spin) */}
-                  <div className="text-4xl mb-2 animate-pulse">⏳</div>
-                  <p className="text-sm font-medium">Đang phân tích...</p>
+                  <div className="text-4xl lg:text-6xl mb-2 animate-pulse">⏳</div>
+                  <p className="text-sm lg:text-base font-medium">Đang phân tích...</p>
                 </div>
               </div>
             )}

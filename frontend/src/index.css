@@ -218,7 +218,7 @@ body {
   animation: spin 1.5s linear infinite;
 }
 
-/* Responsive Container */
+/* Responsive Container - Mobile First to Desktop */
 .container-app {
   width: 100%;
   max-width: 100%;
@@ -227,17 +227,35 @@ body {
   padding-right: max(16px, var(--safe-area-right));
 }
 
+/* Tablet: Slightly wider */
 @media (min-width: 640px) {
   .container-app {
-    max-width: 480px;
+    max-width: 640px; /* Mobile max from tailwind config */
     padding-left: 24px;
     padding-right: 24px;
   }
 }
 
+/* Tablet landscape / Small desktop */
+@media (min-width: 768px) {
+  .container-app {
+    max-width: 768px; /* Tablet max from tailwind config */
+  }
+}
+
+/* Desktop */
 @media (min-width: 1024px) {
   .container-app {
-    max-width: 520px;
+    max-width: 1024px; /* Desktop max from tailwind config */
+    padding-left: 32px;
+    padding-right: 32px;
+  }
+}
+
+/* Large desktop */
+@media (min-width: 1280px) {
+  .container-app {
+    max-width: 1280px;
   }
 }
 

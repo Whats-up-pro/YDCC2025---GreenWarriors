@@ -40,28 +40,36 @@ function App() {
         className="bg-[var(--color-surface)] border-b border-[var(--color-border)] safe-top sticky top-0 z-20"
         role="banner"
       >
-        <div className="container-app py-3">
+        <div className="container-app py-3 lg:py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <h1 className="text-[var(--color-shrimp)] text-xl font-bold">ShrimpDetect</h1>
+            <div className="flex items-center gap-2 lg:gap-3">
+              <div className="w-8 h-8 lg:w-10 lg:h-10 bg-[var(--color-shrimp)] rounded-lg flex items-center justify-center text-white text-xl lg:text-2xl">
+                🦐
+              </div>
+              <div>
+                <h1 className="text-[var(--color-shrimp)] text-xl lg:text-2xl font-bold">ShrimpDetect</h1>
+                <p className="hidden lg:block text-xs text-[var(--color-text-secondary)]">Hệ thống phát hiện bệnh tôm thông minh</p>
+              </div>
             </div>
             <div 
-              className={`flex items-center gap-1.5 px-2 py-1 text-xs ${isOnline ? 'text-[var(--color-success)]' : 'text-[var(--color-warning)]'
+              className={`flex items-center gap-1.5 px-2 py-1 lg:px-3 lg:py-1.5 text-xs lg:text-sm rounded-full ${
+                isOnline ? 'bg-green-50 text-[var(--color-success)]' : 'bg-amber-50 text-[var(--color-warning)]'
               }`}
               role="status"
               aria-live="polite"
               aria-label={isOnline ? 'Trạng thái: Trực tuyến' : 'Trạng thái: Ngoại tuyến'}
             >
               <div className={`status-dot ${isOnline ? 'status-dot-online' : 'status-dot-offline'}`} />
-              <span>{isOnline ? 'Online' : 'Offline'}</span>
+              <span className="hidden sm:inline">{isOnline ? 'Trực tuyến' : 'Ngoại tuyến'}</span>
+              <span className="sm:hidden">{isOnline ? 'Online' : 'Offline'}</span>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Navigation - iOS Bottom Tab Bar Style (when needed) */}
+      {/* Navigation - Responsive: Bottom tabs (mobile) / Side tabs (desktop) */}
       <nav 
-        className="bg-[var(--color-surface)] border-b border-[var(--color-border)] sticky top-[49px] z-10"
+        className="bg-[var(--color-surface)] border-b border-[var(--color-border)] sticky top-[49px] lg:top-[65px] z-10 lg:hidden"
         role="navigation"
         aria-label="Điều hướng chính"
       >
@@ -88,44 +96,85 @@ function App() {
         </div>
       </nav>
 
-      {/* Main Content */}
-      <main className="container-app" role="main">
-        <div className="bg-[var(--color-surface)] min-h-[calc(100vh-98px)] border-x border-b border-[var(--color-border)]">
-          {/* ⚡ PERFORMANCE: Suspense wrapper for lazy loaded components */}
-          <Suspense fallback={
-            <div className="flex items-center justify-center h-64" role="status" aria-live="polite">
-              <div className="text-center">
-                <div className="text-2xl mb-2 animate-pulse">⏳</div>
-                <p className="text-sm text-[var(--color-text-secondary)]">Đang tải...</p>
+      {/* Main Content - Desktop layout with sidebar */}
+      <main className="container-app lg:py-6" role="main">
+        <div className="lg:flex lg:gap-6">
+          {/* Desktop Sidebar Navigation */}
+          <aside className="hidden lg:block lg:w-64 lg:shrink-0">
+            <div className="bg-[var(--color-surface)] border border-[var(--color-border)] rounded-2xl p-4 sticky top-24">
+              <h2 className="text-sm font-semibold text-[var(--color-text-secondary)] mb-3 px-2">Menu</h2>
+              <nav role="tablist" className="space-y-1">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`w-full text-left px-4 py-3 rounded-xl font-medium transition-all ${
+                      activeTab === tab.id
+                        ? 'bg-[var(--color-leaf)] text-white shadow-md'
+                        : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-border)] hover:text-[var(--color-text)]'
+                    }`}
+                    role="tab"
+                    aria-selected={activeTab === tab.id}
+                    aria-controls={`panel-${tab.id}`}
+                    tabIndex={activeTab === tab.id ? 0 : -1}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </nav>
+              
+              {/* Desktop stats/info */}
+              <div className="mt-6 pt-6 border-t border-[var(--color-border)]">
+                <p className="text-xs text-[var(--color-text-muted)] px-2">
+                  Phiên bản 1.0.0
+                </p>
               </div>
             </div>
-          }>
-            <div 
-              id="panel-detect" 
-              role="tabpanel" 
-              aria-labelledby="tab-detect"
-              hidden={activeTab !== 'detect'}
-            >
-              {activeTab === 'detect' && <CameraScanner />}
+          </aside>
+
+          {/* Content Area */}
+          <div className="flex-1 min-w-0">
+            <div className="bg-[var(--color-surface)] min-h-[calc(100vh-98px)] lg:min-h-[calc(100vh-180px)] border-x lg:border border-b lg:rounded-2xl border-[var(--color-border)]">
+              {/* ⚡ PERFORMANCE: Suspense wrapper for lazy loaded components */}
+              <Suspense fallback={
+                <div className="flex items-center justify-center h-64" role="status" aria-live="polite">
+                  <div className="text-center">
+                    <div className="text-2xl mb-2 animate-pulse">⏳</div>
+                    <p className="text-sm text-[var(--color-text-secondary)]">Đang tải...</p>
+                  </div>
+                </div>
+              }>
+                {activeTab === 'detect' && (
+                  <div 
+                    id="panel-detect" 
+                    role="tabpanel" 
+                    aria-labelledby="tab-detect"
+                  >
+                    <CameraScanner />
+                  </div>
+                )}
+                {activeTab === 'history' && (
+                  <div 
+                    id="panel-history" 
+                    role="tabpanel" 
+                    aria-labelledby="tab-history"
+                  >
+                    <HistoryView />
+                  </div>
+                )}
+                {activeTab === 'chat' && (
+                  <div 
+                    id="panel-chat" 
+                    role="tabpanel" 
+                    aria-labelledby="tab-chat"
+                    className="h-[calc(100vh-98px)] lg:h-[calc(100vh-180px)]"
+                  >
+                    <ChatUI />
+                  </div>
+                )}
+              </Suspense>
             </div>
-            <div 
-              id="panel-history" 
-              role="tabpanel" 
-              aria-labelledby="tab-history"
-              hidden={activeTab !== 'history'}
-            >
-              {activeTab === 'history' && <HistoryView />}
-            </div>
-            <div 
-              id="panel-chat" 
-              role="tabpanel" 
-              aria-labelledby="tab-chat"
-              hidden={activeTab !== 'chat'}
-              className="h-[calc(100vh-98px)]"
-            >
-              {activeTab === 'chat' && <ChatUI />}
-            </div>
-          </Suspense>
+          </div>
         </div>
       </main>
     </div>
