@@ -41,7 +41,7 @@ export const ChatUI = () => {
         timestamp: new Date(response.timestamp),
       };
       setMessages((prev) => [...prev, botMessage]);
-    } catch (err) {
+    } catch {
       const errorMessage: Message = {
         text: 'Xin lỗi, đã có lỗi xảy ra. Vui lòng thử lại.',
         isUser: false,
@@ -60,53 +60,73 @@ export const ChatUI = () => {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 hide-scrollbar">
         {messages.length === 0 && (
-          <div className="text-center text-gray-500 mt-8">
-            <p>Chào mừng đến với hệ thống tư vấn!</p>
-            <p className="text-sm mt-2">Hãy đặt câu hỏi về bệnh tôm hoặc cách chăm sóc tôm.</p>
+          <div className="text-center py-12">
+            <div
+              className="w-16 h-16 mx-auto mb-4 flex items-center justify-center bg-cyan-50 text-[var(--color-water)]"
+              style={{ borderRadius: 'var(--radius-md)' }}
+            >
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+              </svg>
+            </div>
+            <p className="text-[var(--color-text-secondary)]">
+              Chào mừng đến với hệ thống tư vấn
+            </p>
+            <p className="text-sm text-[var(--color-text-muted)] mt-1">
+              Hỏi về bệnh tôm hoặc cách chăm sóc
+            </p>
           </div>
         )}
+
         {messages.map((msg, index) => (
           <div
             key={index}
             className={`flex ${msg.isUser ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[80%] rounded-lg p-3 ${
-                msg.isUser
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-200 text-gray-800'
-              }`}
+              className={`max-w-[85%] sm:max-w-[75%] px-3 py-2 text-sm ${msg.isUser
+                  ? 'bg-[var(--color-leaf)] text-white'
+                  : 'bg-[var(--color-border)] text-[var(--color-text)]'
+                }`}
+              style={{ borderRadius: 'var(--radius-sm)' }}
             >
               <p className="whitespace-pre-wrap">{msg.text}</p>
             </div>
           </div>
         ))}
+
         {loading && (
           <div className="flex justify-start">
-            <div className="bg-gray-200 rounded-lg p-3">
-              <p>Đang suy nghĩ...</p>
+            <div
+              className="px-3 py-2 bg-[var(--color-border)] text-[var(--color-text-secondary)] text-sm"
+              style={{ borderRadius: 'var(--radius-sm)' }}
+            >
+              Đang suy nghĩ...
             </div>
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
-      <div className="border-t border-gray-300 p-4">
-        <div className="flex space-x-2">
+
+      {/* Input */}
+      <div className="border-t border-[var(--color-border)] p-3 safe-bottom bg-[var(--color-surface)]">
+        <div className="flex gap-2">
           <input
             type="text"
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Nhập câu hỏi của bạn..."
-            className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            placeholder="Nhập câu hỏi..."
             disabled={loading}
+            className="input flex-1"
           />
           <button
             onClick={handleSend}
             disabled={loading || !inputMessage.trim()}
-            className="bg-blue-500 text-white px-6 py-2 rounded-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed"
+            className="btn btn-primary"
           >
             Gửi
           </button>

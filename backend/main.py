@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api.v1 import detect, chat
+from app.api.v1 import detect, chat, sync
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -23,10 +23,19 @@ app.add_middleware(
 
 app.include_router(detect.router, prefix="/api/v1", tags=["detection"])
 app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
+app.include_router(sync.router, prefix="/api/v1", tags=["sync"])
 
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "version": settings.APP_VERSION}
+
+@app.get("/health/db") 
+async def health_check_db(): 
+    try: 
+        with engine.connect() as conn: conn.execute(text("SELECT 1")) 
+        return {"status": "ok", "db": "connected"} 
+    except Exception as e: 
+        return {"status": "error", "db": str(e)}
 
 if __name__ == "__main__":
     import uvicorn

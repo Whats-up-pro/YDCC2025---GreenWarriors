@@ -1,3 +1,269 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Custom Design System - Green Warriors */
+:root {
+  /* Primary Colors */
+  --color-leaf: #2D5A27;        /* Xanh lá đậm - chính */
+  --color-leaf-light: #4A7C42;  /* Xanh lá nhạt */
+  --color-water: #1E6B7B;       /* Xanh biển - nước ruộng */
+  --color-water-light: #2A8A9C; /* Xanh biển nhạt */
+  --color-sky: #5BA4C9;         /* Xanh trời */
+  --color-sky-light: #89C4E1;   /* Xanh trời nhạt */
+  --color-shrimp: #E8723A;      /* Cam tôm */
+  --color-shrimp-dark: #C85A28; /* Cam đậm */
+  
+  /* Neutral Colors */
+  --color-bg: #F7F9FA;
+  --color-surface: #FFFFFF;
+  --color-border: #E2E8F0;
+  --color-text: #1A202C;
+  --color-text-secondary: #64748B;
+  --color-text-muted: #94A3B8;
+  
+  /* Status Colors */
+  --color-success: #16A34A;
+  --color-warning: #EAB308;
+  --color-danger: #DC2626;
+  
+  /* Spacing */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  
+  /* iOS Safe Areas */
+  --safe-area-top: env(safe-area-inset-top);
+  --safe-area-bottom: env(safe-area-inset-bottom);
+  --safe-area-left: env(safe-area-inset-left);
+  --safe-area-right: env(safe-area-inset-right);
+}
+
+/* Base Styles */
+* {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+html {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+}
+
+/* iOS viewport fix */
+@supports (-webkit-touch-callout: none) {
+  body {
+    min-height: -webkit-fill-available;
+  }
+}
+
+/* Custom Component Classes */
+@layer components {
+  /* Buttons */
+  .btn {
+    @apply inline-flex items-center justify-center font-medium transition-colors;
+    @apply focus:outline-none focus:ring-2 focus:ring-offset-1;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed;
+    border-radius: var(--radius-sm);
+    padding: 10px 16px;
+  }
+  
+  .btn-primary {
+    background-color: var(--color-leaf);
+    color: white;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background-color: var(--color-leaf-light);
+  }
+  .btn-primary:focus {
+    @apply ring-green-500;
+  }
+  
+  .btn-secondary {
+    background-color: var(--color-water);
+    color: white;
+  }
+  .btn-secondary:hover:not(:disabled) {
+    background-color: var(--color-water-light);
+  }
+  
+  .btn-accent {
+    background-color: var(--color-shrimp);
+    color: white;
+  }
+  .btn-accent:hover:not(:disabled) {
+    background-color: var(--color-shrimp-dark);
+  }
+  
+  .btn-ghost {
+    background-color: transparent;
+    color: var(--color-text-secondary);
+  }
+  .btn-ghost:hover:not(:disabled) {
+    background-color: var(--color-border);
+  }
+  
+  .btn-lg {
+    padding: 14px 24px;
+    font-size: 1rem;
+  }
+  
+  .btn-sm {
+    padding: 6px 12px;
+    font-size: 0.875rem;
+  }
+  
+  /* Cards */
+  .card {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+  }
+  
+  /* Input */
+  .input {
+    @apply w-full px-3 py-2 text-sm transition-colors;
+    @apply focus:outline-none focus:ring-2 focus:ring-offset-0;
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    color: var(--color-text);
+  }
+  .input:focus {
+    border-color: var(--color-water);
+    @apply ring-cyan-200;
+  }
+  .input::placeholder {
+    color: var(--color-text-muted);
+  }
+  
+  /* Badge */
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 text-xs font-medium;
+    border-radius: var(--radius-sm);
+  }
+  .badge-success {
+    background-color: #DCFCE7;
+    color: var(--color-success);
+  }
+  .badge-danger {
+    background-color: #FEE2E2;
+    color: var(--color-danger);
+  }
+  .badge-warning {
+    background-color: #FEF3C7;
+    color: #B45309;
+  }
+  .badge-info {
+    background-color: #E0F2FE;
+    color: var(--color-water);
+  }
+  
+  /* Status Indicator */
+  .status-dot {
+    @apply w-2 h-2;
+    border-radius: 50%;
+  }
+  .status-dot-online {
+    background-color: var(--color-success);
+  }
+  .status-dot-offline {
+    background-color: var(--color-warning);
+    animation: pulse 2s infinite;
+  }
+}
+
+/* Animations */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin-slow {
+  animation: spin 1.5s linear infinite;
+}
+
+/* Responsive Container */
+.container-app {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  padding-left: max(16px, var(--safe-area-left));
+  padding-right: max(16px, var(--safe-area-right));
+}
+
+@media (min-width: 640px) {
+  .container-app {
+    max-width: 480px;
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .container-app {
+    max-width: 520px;
+  }
+}
+
+/* Safe Area Padding */
+.safe-top {
+  padding-top: max(12px, var(--safe-area-top));
+}
+
+.safe-bottom {
+  padding-bottom: max(12px, var(--safe-area-bottom));
+}
+
+/* Scrollbar - minimal for desktop */
+@media (min-width: 640px) {
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-text-muted);
+  }
+}
+
+/* Hide scrollbar on mobile */
+@media (max-width: 639px) {
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Touch-friendly tap targets */
+@media (hover: none) and (pointer: coarse) {
+  .btn, button {
+    min-height: 44px;
+  }
+  .input {
+    min-height: 44px;
+    font-size: 16px; /* Prevent iOS zoom on focus */
+  }
+}

@@ -8,7 +8,7 @@ if not _env_file.exists():
     _env_file = Path(__file__).parent.parent.parent.parent / ".env"
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=str(_env_file), case_sensitive=True)
+    model_config = SettingsConfigDict(env_file=str(_env_file), case_sensitive=True, extra="ignore")
     
     APP_NAME: str = "Shrimp Disease Detection API"
     APP_VERSION: str = "1.0.0"
