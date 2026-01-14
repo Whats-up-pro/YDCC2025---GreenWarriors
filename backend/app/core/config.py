@@ -1,8 +1,14 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
+from pathlib import Path
+
+# Find .env file - check current dir first, then parent dir
+_env_file = Path(".env")
+if not _env_file.exists():
+    _env_file = Path(__file__).parent.parent.parent.parent / ".env"
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
+    model_config = SettingsConfigDict(env_file=str(_env_file), case_sensitive=True)
     
     APP_NAME: str = "Shrimp Disease Detection API"
     APP_VERSION: str = "1.0.0"
