@@ -1,14 +1,20 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.core.config import settings
 from app.api.v1 import detect, chat, sync, push
 from app.models.database import engine, SessionLocal
 from sqlalchemy import text
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -16,11 +22,15 @@ app = FastAPI(
     debug=settings.DEBUG
 )
 
+# Add rate limit exception handler
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=settings.cors_origins_list,  # Specific origins only
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],  # Specific methods
     allow_headers=["*"],
 )
 
@@ -31,7 +41,8 @@ app.include_router(sync.router, prefix="/api/v1", tags=["sync"])
 app.include_router(push.router, prefix="/api/v1", tags=["push"])
 
 @app.get("/")
-async def root():
+@limiter.limit("30/minute")
+async def root(request: Request):
     """Root endpoint"""
     return {
         "app": settings.APP_NAME,
@@ -46,7 +57,8 @@ async def root():
     }
 
 @app.get("/health")
-async def health_check():
+@limiter.limit("60/minute")
+async def health_check(request: Request):
     """Basic health check"""
     return {
         "status": "healthy",
@@ -55,7 +67,8 @@ async def health_check():
     }
 
 @app.get("/health/db")
-async def health_check_db():
+@limiter.limit("30/minute")
+async def health_check_db(request: Request):
     """Database health check - test connection to PostgreSQL"""
     db = SessionLocal()
     try:

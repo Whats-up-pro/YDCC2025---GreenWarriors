@@ -7,9 +7,12 @@ The Shrimp Disease Detection System is an AI-powered application designed to hel
 ## Key Features
 
 - **Image-based Disease Detection**: Users capture shrimp images, and the system analyzes and returns results (Healthy/White Spot Disease) with confidence scores
-- **AI Chatbot Consultation**: AI chatbot provides advice on shrimp diseases and care methods
+- **AI Chatbot Consultation**: AI chatbot with OpenAI GPT-3.5-turbo integration and knowledge base fallback
 - **Progressive Web App (PWA)**: Web application that can be installed on mobile devices, functioning like a native app
 - **Workflow Automation**: Integration with n8n for background tasks such as logging and notifications
+- **Database Logging**: All detections automatically saved to PostgreSQL with transaction safety
+- **Advanced Security**: API key authentication, rate limiting, and multi-layer file validation
+- **Knowledge Base Search**: Intelligent search through disease prevention and treatment knowledge
 
 ## System Architecture
 
@@ -41,8 +44,10 @@ The backend serves as an API Gateway and AI Inference Wrapper, handling requests
 **Module Structure**:
 
 - **API Endpoints** (`app/api/v1/`):
-  - `/api/v1/detect`: Endpoint that receives images, performs inference, and returns results
-  - `/api/v1/chat`: Endpoint for AI chat processing
+  - `/api/v1/detect`: Image detection with 4-layer validation and database logging
+  - `/api/v1/chat`: AI chat with OpenAI integration and knowledge base search
+  - `/api/v1/sync`: Data synchronization endpoint
+  - `/api/v1/push`: Push notification endpoint
 
 - **Core Services** (`app/services/`):
   - `ai_service.py`: AI inference service with PyTorch model
@@ -58,14 +63,18 @@ The backend serves as an API Gateway and AI Inference Wrapper, handling requests
   - `schemas.py`: Pydantic schemas for request/response validation
 
 - **Configuration** (`app/core/`):
-  - `config.py`: Settings management with Pydantic Settings
-  - `security.py`: API key authentication
+  - `config.py`: Settings management with Pydantic Settings, specific CORS origins
+  - `security.py`: API key authentication, client IP extraction, comprehensive logging
 
 **Technical Features**:
 - Hot Path optimization: AI inference returns results in < 2 seconds
 - Cold Path: n8n webhooks called via BackgroundTasks (non-blocking)
 - Model loading: Uses state_dict for safe model loading, no class definition required
-- Error handling: Comprehensive error handling with logging
+- Error handling: Comprehensive error handling with logging and context
+- Database Transactions: All database operations use transactions for data integrity
+- Rate Limiting: 10 req/min for detection, 20 req/min for chat, per IP address
+- File Validation: 4-layer validation (content-type, extension, size, magic bytes)
+- OpenAI Integration: GPT-3.5-turbo with knowledge base context injection
 
 ### 3. Orchestration Layer (n8n)
 
@@ -96,14 +105,21 @@ Database stores the following information:
 
 1. User captures image via PWA
 2. Frontend compresses/resizes image
-3. Upload image via API `/api/v1/detect` (multipart/form-data)
-4. Backend receives image, validates file type and size
+3. Upload image via API `/api/v1/detect` (multipart/form-data) with API key
+4. Backend validates request:
+   - API key authentication
+   - Rate limit check (10/minute per IP)
+   - Content-Type validation
+   - File extension check (.jpg, .jpeg, .png)
+   - File size validation (max 10MB)
+   - Magic bytes verification (actual MIME type)
 5. AI Service preprocesses image (resize 224x224, normalize)
 6. PyTorch model inference
-7. Backend returns results (label, confidence, processing_time)
-8. Frontend displays results to user
+7. **Database Transaction**: Save DetectionLog to PostgreSQL
+8. Backend returns results (label, confidence, processing_time)
+9. Frontend displays results to user
 
-Processing time: < 2 seconds
+Processing time: < 2 seconds (including database save)
 
 ### Cold Path (Background)
 
@@ -123,13 +139,16 @@ Processing time: Background, doesn't affect response time
 
 - **Framework**: FastAPI 0.104.1
 - **Language**: Python 3.10+
-- **AI/ML**: PyTorch 2.1.0, TorchVision 0.16.0
+- **AI/ML**: PyTorch 2.9.1, TorchVision 0.21.0+
 - **Database ORM**: SQLAlchemy 2.0.23
-- **Database**: PostgreSQL (via psycopg2-binary)
-- **Validation**: Pydantic 2.5.0, Pydantic Settings 2.1.0
-- **HTTP Client**: httpx 0.25.1 (async)
-- **Image Processing**: Pillow 10.1.0
-- **Server**: Uvicorn (ASGI server)
+- **Database Driver**: psycopg 3.1.0+ (binary)
+- **Validation**: Pydantic 2.12.5, Pydantic Settings 2.12.0
+- **HTTP Client**: httpx 0.28.1 (async)
+- **Image Processing**: Pillow 11.3.0
+- **Server**: Uvicorn 0.24.0 (ASGI server)
+- **Security**: slowapi 0.1.9 (rate limiting)
+- **File Validation**: python-magic 0.4.27
+- **AI Chat**: OpenAI 2.8.1 (GPT-3.5-turbo)
 
 ### Frontend
 
@@ -210,34 +229,59 @@ Create a `.env` file in the root directory:
 
 ```env
 # Database
-DATABASE_URL=postgresql://postgres:postgres@db:5432/shrimp_db
-DB_NAME=shrimp_db
-DB_USER=postgres
-DB_PASSWORD=postgres
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/shrimp_db
+DB_POOL_SIZE=10
+DB_MAX_OVERFLOW=20
 
 # AI Model
 MODEL_PATH=ml_models/wsd_model_v1.pth
 MODEL_DEVICE=cpu
 MODEL_CONFIDENCE_THRESHOLD=0.7
 
-# n8n
-N8N_WEBHOOK_URL=http://n8n:5678/webhook
+# n8n Integration
+N8N_WEBHOOK_URL=http://localhost:5678/webhook/detect
 N8N_TIMEOUT=5
 N8N_MAX_RETRIES=3
 N8N_RETRY_DELAY=1.0
 
 # Security
-API_KEY=your_api_key_here
+API_KEY=your_secure_api_key_here
+CORS_ORIGINS=http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173
 
-# Frontend
-VITE_API_URL=http://localhost:8000
+# File Upload
+MAX_UPLOAD_SIZE=10485760  # 10MB in bytes
+ALLOWED_EXTENSIONS=.jpg,.jpeg,.png
+
+# OpenAI (Optional - for advanced chat features)
+OPENAI_API_KEY=sk-your-openai-api-key-here
+
+# App Settings
+APP_NAME=Shrimp Disease Detection API
+APP_VERSION=1.0.0
+DEBUG=False
 ```
 
-### 3. Add AI Model (Optional)
+### 3. Initialize Database
+
+Run the database initialization script to create tables and insert sample data:
+
+```bash
+cd backend
+python init_db.py
+```
+
+This script will:
+- Test database connection
+- Create all required tables (users, detection_logs, market_prices, knowledge_base)
+- Verify table structure
+- Insert sample knowledge base entries
+- Generate initialization log (init_db.log)
+
+### 4. Add AI Model (Optional)
 
 If you have an AI model, place the `.pth` file in `backend/ml_models/`. The model must be saved as state_dict or checkpoint with 'state_dict' key.
 
-### 4. Run with Docker Compose
+### 5. Run with Docker Compose
 
 ```bash
 cd deployments
@@ -250,7 +294,7 @@ Services will be started:
 - n8n UI: http://localhost:5678
 - PostgreSQL: localhost:5432
 
-### 5. View Logs
+### 6. View Logs
 
 ```bash
 cd deployments
@@ -291,6 +335,9 @@ When the backend is running, access:
 
 Detect disease from shrimp image.
 
+**Headers**:
+- `X-API-Key`: Your API key (if configured)
+
 **Request**: multipart/form-data with image file
 
 **Response**:
@@ -302,25 +349,43 @@ Detect disease from shrimp image.
 }
 ```
 
+**Rate Limit**: 10 requests/minute per IP
+
+**Validation**:
+- Content-Type must be image/*
+- File extension: .jpg, .jpeg, .png only
+- Max file size: 10MB
+- Magic bytes validation
+
 #### POST /api/v1/chat
 
-Chat with AI chatbot.
+Chat with AI chatbot (OpenAI GPT-3.5-turbo + Knowledge Base).
+
+**Headers**:
+- `X-API-Key`: Your API key (if configured)
 
 **Request**:
 ```json
 {
-  "message": "User's question",
-  "user_id": 1
+  "message": "User's question (max 1000 chars)"
 }
 ```
 
 **Response**:
 ```json
 {
-  "response": "AI response",
+  "response": "AI response based on knowledge base and OpenAI",
   "timestamp": "2024-01-01T00:00:00"
 }
 ```
+
+**Rate Limit**: 20 requests/minute per IP
+
+**Features**:
+- Searches knowledge base for relevant context
+- Injects context into OpenAI GPT-3.5-turbo prompt
+- Falls back to knowledge base only if OpenAI unavailable
+- Validates input length and emptiness
 
 ## Optimization and Best Practices
 
@@ -339,9 +404,18 @@ Chat with AI chatbot.
 
 ### Security
 
-- **API Key**: Optional API key authentication
-- **CORS**: Configurable CORS origins
-- **File Validation**: Validate file type and size before processing
+- **API Key Authentication**: X-API-Key header validation on all endpoints
+- **Rate Limiting**: Per-IP rate limits (10/min detect, 20/min chat, 30-60/min health)
+- **CORS**: Specific origins only (localhost:3000, localhost:5173, 127.0.0.1)
+- **File Validation**: 4-layer validation system
+  1. Content-Type header check (must be image/*)
+  2. File extension whitelist (.jpg, .jpeg, .png only)
+  3. File size limit (max 10MB)
+  4. Magic bytes verification (python-magic for actual MIME type)
+- **Database Transactions**: All operations wrapped in transactions
+- **Input Validation**: Pydantic schemas + custom validators
+- **Error Logging**: Comprehensive logging with context and stack traces
+- **No Trust Client**: Server-side validation of all inputs
 
 ## License
 
