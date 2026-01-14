@@ -97,7 +97,7 @@ function App() {
       </nav>
 
       {/* Main Content - Desktop layout with sidebar */}
-      <main className="container-app lg:py-6" role="main">
+      <main className="container-app py-4 lg:py-6" role="main">
         <div className="lg:flex lg:gap-6">
           {/* Desktop Sidebar Navigation */}
           <aside className="hidden lg:block lg:w-64 lg:shrink-0">
@@ -134,7 +134,7 @@ function App() {
 
           {/* Content Area */}
           <div className="flex-1 min-w-0">
-            <div className="bg-[var(--color-surface)] min-h-[calc(100vh-98px)] lg:min-h-[calc(100vh-180px)] border-x lg:border border-b lg:rounded-2xl border-[var(--color-border)]">
+            <div className="bg-[var(--color-surface)] min-h-[calc(100vh-180px)] border lg:border border-[var(--color-border)] lg:rounded-2xl overflow-hidden">
               {/* ⚡ PERFORMANCE: Suspense wrapper for lazy loaded components */}
               <Suspense fallback={
                 <div className="flex items-center justify-center h-64" role="status" aria-live="polite">
