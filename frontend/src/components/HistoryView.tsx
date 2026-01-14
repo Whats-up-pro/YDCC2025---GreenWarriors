@@ -29,10 +29,14 @@ export const HistoryView = () => {
     const loadData = async () => {
         setIsLoading(true);
         try {
+            console.log('🔄 Loading history data...');
             const [fetchedRecords, fetchedStats] = await Promise.all([
                 dbHelpers.getDetections(50),
                 dbHelpers.getStats()
             ]);
+            
+            console.log('📊 Fetched records:', fetchedRecords.length);
+            console.log('📈 Stats:', fetchedStats);
             
             // Create Blob URLs for thumbnails
             const urlMap = new Map<number, string>();
@@ -41,11 +45,14 @@ export const HistoryView = () => {
                     try {
                         const url = URL.createObjectURL(record.imageThumbnail);
                         urlMap.set(record.id, url);
+                        console.log(`✅ Created URL for record #${record.id}`);
                     } catch (err) {
-                        console.error('Failed to create thumbnail URL:', err);
+                        console.error(`❌ Failed to create thumbnail URL for record #${record.id}:`, err);
                     }
                 }
             });
+            
+            console.log('🖼️ Created', urlMap.size, 'thumbnail URLs');
             
             // Revoke old URLs
             thumbnailUrls.forEach(url => URL.revokeObjectURL(url));
@@ -54,7 +61,7 @@ export const HistoryView = () => {
             setRecords(fetchedRecords);
             setStats(fetchedStats);
         } catch (error) {
-            console.error('Failed to load history:', error);
+            console.error('❌ Failed to load history:', error);
         } finally {
             setIsLoading(false);
         }
