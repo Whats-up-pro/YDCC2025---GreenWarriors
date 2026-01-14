@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { visualizer } from 'rollup-plugin-visualizer'
 
 export default defineConfig({
   plugins: [
@@ -65,6 +66,14 @@ export default defineConfig({
         enabled: true,
         type: 'module'
       }
+    }),
+    // 📈 PERFORMANCE BUDGET: Bundle size analyzer
+    visualizer({
+      filename: 'dist/stats.html',
+      open: false,
+      gzipSize: true,
+      brotliSize: true,
+      template: 'treemap', // sunburst, treemap, network
     })
   ],
   server: {
@@ -73,12 +82,30 @@ export default defineConfig({
   },
   build: {
     sourcemap: false,
+    // 🎯 PERFORMANCE BUDGET: Target < 300KB gzipped
+    chunkSizeWarningLimit: 300,
     rollupOptions: {
       output: {
         manualChunks: {
+          // Vendor chunk: React ecosystem
           vendor: ['react', 'react-dom'],
-          utils: ['axios']
-        }
+          // Database chunk: IndexedDB
+          database: ['dexie'],
+          // Utils chunk: HTTP client
+          utils: ['axios', 'zustand']
+        },
+        // 📦 Optimize chunk naming for caching
+        chunkFileNames: 'assets/[name]-[hash].js',
+        entryFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash].[ext]'
+      }
+    },
+    // ⚡ Performance optimizations
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true, // Remove console.log in production
+        drop_debugger: true
       }
     }
   }

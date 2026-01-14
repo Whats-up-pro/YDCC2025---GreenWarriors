@@ -63,3 +63,40 @@ class N8NClient:
             "user_id": user_id,
             "message": message
         })
+
+# Singleton instance
+n8n_client = N8NClient()
+
+# Helper function for easy import
+async def trigger_detection_notification(
+    user_id: int,
+    detection_id: int,
+    label: str,
+    confidence: float
+) -> bool:
+    """
+    Trigger n8n notification for disease detection
+    
+    Args:
+        user_id: User ID
+        detection_id: Detection log ID
+        label: Detection label (Healthy/WSD/Unknown)
+        confidence: Confidence score (0-1)
+    
+    Returns:
+        True if notification sent successfully
+    """
+    try:
+        data = {
+            "user_id": user_id,
+            "detection_id": detection_id,
+            "label": label,
+            "confidence": confidence,
+            "alert_level": "high" if label == "WSD" and confidence > 0.7 else "normal",
+            "message": f"Phát hiện {label} với độ tin cậy {confidence*100:.1f}%"
+        }
+        
+        return await n8n_client.trigger_workflow("detect_notification", data)
+    except Exception as e:
+        logger.error(f"Failed to trigger detection notification: {e}")
+        return False

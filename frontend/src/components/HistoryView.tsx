@@ -8,6 +8,7 @@ export const HistoryView = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isSyncing, setIsSyncing] = useState(false);
     const [isOnline, setIsOnline] = useState(navigator.onLine);
+    const [thumbnailUrls, setThumbnailUrls] = useState<Map<number, string>>(new Map());
 
     useEffect(() => {
         loadData();
@@ -20,6 +21,8 @@ export const HistoryView = () => {
         return () => {
             window.removeEventListener('online', handleOnline);
             window.removeEventListener('offline', handleOffline);
+            // Cleanup all Blob URLs
+            thumbnailUrls.forEach(url => URL.revokeObjectURL(url));
         };
     }, []);
 
@@ -30,6 +33,24 @@ export const HistoryView = () => {
                 dbHelpers.getDetections(50),
                 dbHelpers.getStats()
             ]);
+            
+            // Create Blob URLs for thumbnails
+            const urlMap = new Map<number, string>();
+            fetchedRecords.forEach(record => {
+                if (record.id && record.imageThumbnail) {
+                    try {
+                        const url = URL.createObjectURL(record.imageThumbnail);
+                        urlMap.set(record.id, url);
+                    } catch (err) {
+                        console.error('Failed to create thumbnail URL:', err);
+                    }
+                }
+            });
+            
+            // Revoke old URLs
+            thumbnailUrls.forEach(url => URL.revokeObjectURL(url));
+            
+            setThumbnailUrls(urlMap);
             setRecords(fetchedRecords);
             setStats(fetchedStats);
         } catch (error) {
@@ -77,7 +98,9 @@ export const HistoryView = () => {
             <div
                 className={`mb-4 p-3 flex items-center justify-between text-sm ${isOnline ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'
                     } border`}
-                style={{ borderRadius: 'var(--radius-sm)' }}
+                style={{ borderRadius: '12px' }} /* iOS 12px */
+                role="status"
+                aria-live="polite"
             >
                 <div className="flex items-center gap-2">
                     <div className={`status-dot ${isOnline ? 'status-dot-online' : 'status-dot-offline'}`} />
@@ -90,6 +113,8 @@ export const HistoryView = () => {
                         onClick={handleSync}
                         disabled={!isOnline || isSyncing}
                         className="btn btn-sm btn-secondary"
+                        aria-label={`Đồng bộ ${stats.pending} bản ghi chưa đồng bộ`}
+                        aria-busy={isSyncing}
                     >
                         {isSyncing ? 'Đang đồng bộ...' : `Đồng bộ (${stats.pending})`}
                     </button>
@@ -125,37 +150,50 @@ export const HistoryView = () => {
                     <h3 className="text-sm font-medium text-[var(--color-text-secondary)] mb-3">
                         Lịch sử gần đây
                     </h3>
-                    {records.map((record) => (
-                        <div
-                            key={record.id}
-                            className="card p-3 flex items-center gap-3"
-                        >
-                            <img
-                                src={record.imagePreview}
-                                alt=""
-                                className="w-14 h-14 object-cover border border-[var(--color-border)]"
-                                style={{ borderRadius: 'var(--radius-sm)' }}
-                            />
+                    {records.map((record) => {
+                        const thumbnailUrl = record.id ? thumbnailUrls.get(record.id) : undefined;
+                        
+                        return (
+                            <div
+                                key={record.id}
+                                className="card p-3 flex items-center gap-3"
+                            >
+                                {thumbnailUrl ? (
+                                    <img
+                                        src={thumbnailUrl}
+                                        alt={`Ảnh phát hiện ${record.label}`}
+                                        className="w-14 h-14 object-cover border border-[var(--color-border)]"
+                                        style={{ borderRadius: '12px' }} /* iOS 12px */
+                                    />
+                                ) : (
+                                    <div 
+                                        className="w-14 h-14 bg-gray-100 flex items-center justify-center border border-[var(--color-border)]"
+                                        style={{ borderRadius: '12px' }}
+                                    >
+                                        <span className="text-2xl">🦐</span>
+                                    </div>
+                                )}
 
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-1">
-                                    <span className={`badge ${record.label === 'WSD' ? 'badge-danger' : 'badge-success'
-                                        }`}>
-                                        {record.label === 'WSD' ? 'Bệnh' : 'Khỏe'}
-                                    </span>
-                                    {!record.synced && (
-                                        <span className="badge badge-warning">Chờ đồng bộ</span>
-                                    )}
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <span className={`badge ${record.label === 'WSD' ? 'badge-danger' : 'badge-success'
+                                            }`}>
+                                            {record.label === 'WSD' ? 'Bệnh' : 'Khỏe'}
+                                        </span>
+                                        {!record.synced && (
+                                            <span className="badge badge-warning">Chờ đồng bộ</span>
+                                        )}
+                                    </div>
+                                    <p className="text-sm text-[var(--color-text-secondary)]">
+                                        {(record.confidence * 100).toFixed(0)}% tin cậy
+                                    </p>
+                                    <p className="text-xs text-[var(--color-text-muted)]">
+                                        {formatDate(new Date(record.timestamp))}
+                                    </p>
                                 </div>
-                                <p className="text-sm text-[var(--color-text-secondary)]">
-                                    {(record.confidence * 100).toFixed(0)}% tin cậy
-                                </p>
-                                <p className="text-xs text-[var(--color-text-muted)]">
-                                    {formatDate(record.timestamp)}
-                                </p>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
         </div>

@@ -5,7 +5,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "analyze": "vite build && open dist/stats.html",
+    "size": "size-limit",
+    "size:why": "size-limit --why"
   },
   "dependencies": {
     "axios": "^1.6.2",
@@ -15,14 +18,37 @@
     "zustand": "^4.4.7"
   },
   "devDependencies": {
+    "@size-limit/preset-app": "^12.0.0",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.16",
     "postcss": "^8.4.32",
+    "rollup-plugin-visualizer": "^6.0.5",
+    "size-limit": "^12.0.0",
     "tailwindcss": "^3.3.6",
     "typescript": "^5.3.3",
     "vite": "^6.1.6",
     "vite-plugin-pwa": "^0.21.2"
-  }
+  },
+  "size-limit": [
+    {
+      "name": "Total Bundle (gzipped)",
+      "path": "dist/assets/*.js",
+      "limit": "300 KB",
+      "gzip": true
+    },
+    {
+      "name": "Vendor Chunk",
+      "path": "dist/assets/vendor-*.js",
+      "limit": "150 KB",
+      "gzip": true
+    },
+    {
+      "name": "App Chunk",
+      "path": "dist/assets/index-*.js",
+      "limit": "100 KB",
+      "gzip": true
+    }
+  ]
 }

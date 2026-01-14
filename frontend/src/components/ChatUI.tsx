@@ -66,9 +66,11 @@ export const ChatUI = () => {
           <div className="text-center py-12">
             <div
               className="w-16 h-16 mx-auto mb-4 flex items-center justify-center bg-cyan-50 text-[var(--color-water)]"
-              style={{ borderRadius: 'var(--radius-md)' }}
+              style={{ borderRadius: '20px' }} /* iOS 20px large icon */
+              role="img"
+              aria-label="Biểu tượng trò chuyện"
             >
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
                 <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
               </svg>
             </div>
@@ -91,7 +93,9 @@ export const ChatUI = () => {
                   ? 'bg-[var(--color-leaf)] text-white'
                   : 'bg-[var(--color-border)] text-[var(--color-text)]'
                 }`}
-              style={{ borderRadius: 'var(--radius-sm)' }}
+              style={{ borderRadius: '16px' }} /* iOS 16px message bubble */
+              role="article"
+              aria-label={msg.isUser ? 'Tin nhắn của bạn' : 'Phản hồi từ hệ thống'}
             >
               <p className="whitespace-pre-wrap">{msg.text}</p>
             </div>
@@ -102,7 +106,9 @@ export const ChatUI = () => {
           <div className="flex justify-start">
             <div
               className="px-3 py-2 bg-[var(--color-border)] text-[var(--color-text-secondary)] text-sm"
-              style={{ borderRadius: 'var(--radius-sm)' }}
+              style={{ borderRadius: '16px' }} /* iOS 16px */
+              role="status"
+              aria-live="polite"
             >
               Đang suy nghĩ...
             </div>
@@ -122,11 +128,15 @@ export const ChatUI = () => {
             placeholder="Nhập câu hỏi..."
             disabled={loading}
             className="input flex-1"
+            aria-label="Ô nhập tin nhắn"
+            aria-invalid="false"
           />
           <button
             onClick={handleSend}
             disabled={loading || !inputMessage.trim()}
             className="btn btn-primary"
+            aria-label="Gửi tin nhắn"
+            aria-busy={loading}
           >
             Gửi
           </button>

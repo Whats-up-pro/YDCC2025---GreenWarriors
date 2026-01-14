@@ -63,3 +63,6 @@ frontend/build/
 
 # n8n data
 n8n/n8n_data/
+
+# documentation
+.agents/artifacts/

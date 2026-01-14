@@ -31,7 +31,7 @@ class AIService {
     }
 
     // Predict using local model (placeholder)
-    async predictLocal(imageElement: HTMLImageElement): Promise<{
+    async predictLocal(_imageElement: HTMLImageElement): Promise<{
         label: 'Healthy' | 'WSD';
         confidence: number;
         processingTime: number;
@@ -72,8 +72,9 @@ class AIService {
             try {
                 const result = await detectionAPI.detect(file);
                 return {
-                    ...result,
                     label: result.label as 'Healthy' | 'WSD',
+                    confidence: result.confidence,
+                    processingTime: result.processing_time, // Map snake_case to camelCase
                     source: 'server'
                 };
             } catch (error) {
@@ -126,7 +127,7 @@ class AIService {
     }
 
     // Create thumbnail for storage
-    async createThumbnail(file: File, maxSize = 200): Promise<string> {
+    async createThumbnail(file: File, maxSize = 200): Promise<Blob> {
         const img = await this.fileToImage(file);
         const canvas = document.createElement('canvas');
 
@@ -150,7 +151,17 @@ class AIService {
         const ctx = canvas.getContext('2d')!;
         ctx.drawImage(img, 0, 0, width, height);
 
-        return canvas.toDataURL('image/jpeg', 0.7);
+        // Return Blob instead of data URL for IndexedDB
+        return new Promise((resolve, reject) => {
+            canvas.toBlob(
+                (blob) => {
+                    if (blob) resolve(blob);
+                    else reject(new Error('Failed to create thumbnail'));
+                },
+                'image/jpeg',
+                0.7
+            );
+        });
     }
 }
 
