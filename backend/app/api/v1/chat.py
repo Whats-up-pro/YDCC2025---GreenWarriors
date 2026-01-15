@@ -9,8 +9,6 @@ from sqlalchemy import text
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 import logging
-import os
-import openai
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -19,13 +17,20 @@ limiter = Limiter(key_func=get_remote_address)
 
 n8n_client = N8NClient()
 
-# Configure OpenAI (optional, falls back to knowledge base if not configured)
-openai_api_key = os.getenv("OPENAI_API_KEY")
-if openai_api_key:
-    openai.api_key = openai_api_key
-    logger.info("OpenAI API configured")
+# Configure Gemini AI (optional, falls back to knowledge base if not configured)
+gemini_model = None
+if settings.GEMINI_API_KEY:
+    try:
+        from google import genai
+        from google.genai import types
+        
+        client = genai.Client(api_key=settings.GEMINI_API_KEY)
+        gemini_model = client
+        logger.info("Gemini AI configured (google.genai)")
+    except Exception as e:
+        logger.warning(f"Failed to configure Gemini AI: {e}")
 else:
-    logger.warning("OPENAI_API_KEY not set - using knowledge base only")
+    logger.warning("GEMINI_API_KEY not set - using knowledge base only")
 
 
 def search_knowledge_base(query: str, db, limit: int = 3):
@@ -46,6 +51,56 @@ def search_knowledge_base(query: str, db, limit: int = 3):
     except Exception as e:
         logger.error(f"Knowledge base search error: {e}")
         return []
+
+
+def _get_generic_response(message: str) -> str:
+    """Provide generic helpful response when OpenAI and KB are unavailable."""
+    message_lower = message.lower()
+    
+    # Disease detection keywords
+    if any(word in message_lower for word in ['bệnh', 'wsd', 'white spot', 'đốm trắng', 'chết']):
+        return """🔬 **Về phát hiện bệnh tôm:**
+
+Hệ thống của chúng tôi hỗ trợ phát hiện bệnh đốm trắng (WSD) qua hình ảnh. Bạn có thể:
+- Chụp ảnh tôm và upload lên để AI phân tích
+- Nhận kết quả ngay lập tức với độ tin cậy cao
+- Được cảnh báo sớm nếu phát hiện bệnh
+
+Nếu cần tư vấn chi tiết, vui lòng liên hệ chuyên gia."""
+
+    # Care and prevention keywords
+    elif any(word in message_lower for word in ['chăm sóc', 'nuôi', 'phòng', 'điều trị']):
+        return """🦐 **Về chăm sóc tôm:**
+
+Một số nguyên tắc cơ bản:
+- Kiểm tra chất lượng nước thường xuyên
+- Cho ăn đúng liều lượng và thời gian
+- Theo dõi dấu hiệu bất thường hàng ngày
+- Vệ sinh ao thường xuyên
+
+Sử dụng tính năng phát hiện bệnh để theo dõi sức khỏe đàn tôm."""
+
+    # General greeting
+    elif any(word in message_lower for word in ['xin chào', 'hello', 'chào', 'hê lô', 'hi']):
+        return """👋 Xin chào! Tôi là trợ lý AI chuyên về nuôi tôm.
+
+Tôi có thể giúp bạn:
+- Phát hiện bệnh tôm qua hình ảnh
+- Tư vấn về chăm sóc và phòng bệnh
+- Cung cấp thông tin về bệnh đốm trắng (WSD)
+
+Bạn cần hỗ trợ gì?"""
+
+    # Default response
+    else:
+        return """Xin lỗi, tôi không tìm thấy thông tin liên quan trong cơ sở dữ liệu. 
+
+Bạn có thể hỏi về:
+- Phát hiện bệnh tôm
+- Cách chăm sóc và nuôi tôm
+- Phòng ngừa bệnh đốm trắng (WSD)
+
+Hoặc sử dụng tính năng phát hiện bệnh bằng hình ảnh."""
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -72,8 +127,8 @@ async def chat(
         # Search knowledge base first
         kb_results = search_knowledge_base(chat_request.message, db)
         
-        # Try OpenAI if configured
-        if openai_api_key:
+        # Try Gemini AI if configured
+        if gemini_model:
             try:
                 # Build context from knowledge base
                 context = "\n\n".join([
@@ -81,34 +136,33 @@ async def chat(
                     for r in kb_results
                 ]) if kb_results else ""
                 
-                # Call OpenAI API
-                response = openai.ChatCompletion.create(
-                    model="gpt-3.5-turbo",
-                    messages=[
-                        {
-                            "role": "system", 
-                            "content": f"""Bạn là chuyên gia tư vấn nuôi tôm. 
+                # Build prompt for Gemini
+                prompt = f"""Bạn là chuyên gia tư vấn nuôi tôm. 
 Trả lời câu hỏi dựa trên kiến thức sau (nếu có):
 {context}
 
-Nếu không có thông tin liên quan, hãy dùng kiến thức chung về nuôi tôm."""
-                        },
-                        {"role": "user", "content": chat_request.message}
-                    ],
-                    max_tokens=500,
-                    temperature=0.7
+Nếu không có thông tin liên quan, hãy dùng kiến thức chung về nuôi tôm.
+
+Câu hỏi: {chat_request.message}
+
+Trả lời ngắn gọn, súc tích trong 2-3 đoạn văn."""
+                
+                # Call Gemini API with correct model name
+                response = gemini_model.models.generate_content(
+                    model='gemini-2.5-flash',
+                    contents=prompt
                 )
+                response_text = response.text
+                logger.info(f"Gemini AI response generated ({len(response_text)} chars)")
                 
-                response_text = response.choices[0].message.content
-                logger.info(f"OpenAI response generated ({len(response_text)} chars)")
-                
-            except Exception as openai_error:
-                logger.error(f"OpenAI API error: {openai_error}")
-                # Fallback to knowledge base
+            except Exception as gemini_error:
+                logger.error(f"Gemini AI error: {gemini_error}")
+                # Fallback to knowledge base or generic response
                 if kb_results:
                     response_text = f"Dựa trên kiến thức của chúng tôi:\n\n{kb_results[0]['content']}"
                 else:
-                    response_text = "Xin lỗi, tôi không tìm thấy thông tin liên quan. Vui lòng liên hệ chuyên gia để được tư vấn chi tiết."
+                    # Provide helpful generic response
+                    response_text = _get_generic_response(chat_request.message)
         else:
             # Knowledge base only mode
             if kb_results:
@@ -116,7 +170,7 @@ Nếu không có thông tin liên quan, hãy dùng kiến thức chung về nuô
                 if len(kb_results) > 1:
                     response_text += f"\n\nXem thêm: {', '.join([r['title'] for r in kb_results[1:]])}"
             else:
-                response_text = "Xin lỗi, tôi không tìm thấy thông tin liên quan trong cơ sở dữ liệu. Vui lòng hỏi về bệnh tôm, cách chăm sóc hoặc phòng bệnh."
+                response_text = _get_generic_response(chat_request.message)
         
         return ChatResponse(
             response=response_text,

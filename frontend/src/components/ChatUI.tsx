@@ -41,9 +41,22 @@ export const ChatUI = () => {
         timestamp: new Date(response.timestamp),
       };
       setMessages((prev) => [...prev, botMessage]);
-    } catch {
+    } catch (error: any) {
+      console.error('Chat error:', error);
+      console.error('Error response:', error.response);
+      console.error('Error message:', error.message);
+      
+      let errorText = 'Xin lỗi, đã có lỗi xảy ra. Vui lòng thử lại.';
+      
+      // Show more specific error for debugging
+      if (error.response) {
+        errorText = `Lỗi ${error.response.status}: ${error.response.data?.detail || error.message}`;
+      } else if (error.request) {
+        errorText = 'Không thể kết nối đến server. Vui lòng kiểm tra kết nối mạng.';
+      }
+      
       const errorMessage: Message = {
-        text: 'Xin lỗi, đã có lỗi xảy ra. Vui lòng thử lại.',
+        text: errorText,
         isUser: false,
         timestamp: new Date(),
       };

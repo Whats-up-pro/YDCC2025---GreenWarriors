@@ -28,7 +28,11 @@ class Settings(BaseSettings):
     N8N_RETRY_DELAY: float = 1.0
     
     API_KEY: Optional[str] = None
-    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173"
+    CORS_ORIGINS: str = ""  # Read from .env, no default
+    
+    # AI Integration
+    GEMINI_API_KEY: Optional[str] = None  # Google Gemini API
+    OPENAI_API_KEY: Optional[str] = None  # Legacy OpenAI (deprecated)
     
     @property
     def cors_origins_list(self) -> list[str]:

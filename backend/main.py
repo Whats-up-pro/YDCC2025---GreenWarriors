@@ -30,7 +30,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,  # Specific origins only
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],  # Specific methods
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Add OPTIONS for CORS preflight
     allow_headers=["*"],
 )
 
