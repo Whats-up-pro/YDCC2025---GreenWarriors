@@ -9,6 +9,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import logging
+import re
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -26,13 +27,36 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins_list,  # Specific origins only
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Add OPTIONS for CORS preflight
-    allow_headers=["*"],
-)
+# Dynamic CORS - Accept localhost + any DevTunnels URL
+def is_allowed_origin(origin: str) -> bool:
+    """Check if origin is allowed using pattern matching."""
+    allowed_patterns = [
+        r"^https?://localhost(:\d+)?$",
+        r"^https?://127\.0\.0\.1(:\d+)?$",
+        r"^https?://.*\.devtunnels\.ms$",  # Any DevTunnel subdomain
+    ]
+    return any(re.match(pattern, origin) for pattern in allowed_patterns)
+
+@app.middleware("http")
+async def dynamic_cors_middleware(request: Request, call_next):
+    """Custom CORS middleware with wildcard support."""
+    origin = request.headers.get("origin")
+    
+    # Process request
+    response = await call_next(request)
+    
+    # Add CORS headers if origin is allowed
+    if origin and is_allowed_origin(origin):
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+    
+    # Handle preflight
+    if request.method == "OPTIONS":
+        response.headers["Access-Control-Max-Age"] = "600"
+    
+    return response
 
 # Include routers
 app.include_router(detect.router, prefix="/api/v1", tags=["detection"])

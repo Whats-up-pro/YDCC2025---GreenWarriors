@@ -1,8 +1,33 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+/**
+ * Auto-detect API URL based on environment:
+ * 1. VITE_API_URL env var (highest priority)
+ * 2. If on DevTunnels, use backend DevTunnels URL (port 8000)
+ * 3. Fallback to localhost:8000
+ */
+function getApiBaseUrl(): string {
+  // 1. Check env var first
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  
+  // 2. If on DevTunnels, auto-detect backend URL
+  const currentHost = window.location.hostname;
+  if (currentHost.includes('devtunnels.ms')) {
+    // Replace frontend port with backend port (8000)
+    const backendUrl = window.location.origin.replace(/-\d+\./, '-8000.');
+    return backendUrl;
+  }
+  
+  // 3. Fallback to localhost
+  return 'http://localhost:8000';
+}
+
+const API_BASE_URL = getApiBaseUrl();
 
 console.log('🔧 API Base URL:', API_BASE_URL);
+console.log('🌐 Current Origin:', window.location.origin);
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
