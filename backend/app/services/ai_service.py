@@ -11,7 +11,7 @@ import torchvision.transforms as transforms
 from PIL import Image
 
 from app.core.config import settings
-from app.models.resnet_cbam import ResNetCBAM  # <-- bạn phải tạo file này
+from app.models.resnet_cbam import ResNetCBAM
 
 logger = logging.getLogger(__name__)
 
@@ -19,23 +19,19 @@ logger = logging.getLogger(__name__)
 class AIService:
     def __init__(self):
         self.model: Optional[nn.Module] = None
-
-        # device từ settings (vd: "cuda" / "cpu")
         self.device = torch.device(settings.MODEL_DEVICE)
 
         # preprocess chuẩn ResNet
         self.transform = transforms.Compose([
             transforms.Resize((224, 224)),
-            transforms.ToTensor(),  # [0..1]
+            transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                  std=[0.229, 0.224, 0.225]),
         ])
 
-        # tên lớp theo đúng mapping lúc train
-        # khuyến nghị set trong .env / settings: CLASS_NAMES="healthy,wssv"
+        # tên lớp (đúng thứ tự label lúc train)
+        # ví dụ .env: CLASS_NAMES=Healthy,WSSV
         self.class_names: List[str] = getattr(settings, "CLASS_NAMES", ["Healthy", "WSSV"])
-        # normalize nhẹ để trả label đẹp
-        # (bạn có thể để đúng như bạn muốn)
         self.class_names = [str(x) for x in self.class_names]
 
         self._load_model()
@@ -52,36 +48,25 @@ class AIService:
 
             checkpoint = torch.load(settings.MODEL_PATH, map_location=self.device)
 
-            # ---- lấy state_dict ----
+            # lấy state_dict
             if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
                 state_dict = checkpoint["state_dict"]
             elif isinstance(checkpoint, dict):
-                # đôi khi checkpoint chính là state_dict
                 state_dict = checkpoint
             else:
                 logger.error("Unknown checkpoint format (expected dict).")
                 return
 
-            # ---- strip 'module.' nếu train bằng DataParallel ----
-            cleaned = {}
-            for k, v in state_dict.items():
-                cleaned[k.replace("module.", "")] = v
-            state_dict = cleaned
+            # strip 'module.' nếu train bằng DataParallel
+            state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
 
-            # ---- dựng model đúng số lớp ----
-            # ƯU TIÊN: num_classes lấy từ settings.CLASS_NAMES
-            num_classes = len(self.class_names)
+            # ---- đúng theo bạn muốn: dùng pretrain mặc định trong ResNetCBAM ----
+            # (ResNetCBAM tự gọi resnet101(weights=ResNet101_Weights.IMAGENET1K_V1) nếu bạn để mặc định)
+            num_classes = len(self.class_names) if self.class_names else 2
+            model = ResNetCBAM(num_classes=num_classes).to(self.device)
 
-            # Nếu checkpoint có num_classes thì dùng (nếu bạn có lưu)
-            if isinstance(checkpoint, dict) and "num_classes" in checkpoint:
-                try:
-                    num_classes = int(checkpoint["num_classes"])
-                except Exception:
-                    pass
-
-            model = ResNetCBAM(num_classes=num_classes, pretrained=False)
-            model.load_state_dict(state_dict, strict=True)  # strict=True để chắc khớp kiến trúc
-            model.to(self.device)
+            # load weights bạn train (sẽ override pretrained backbone)
+            model.load_state_dict(state_dict, strict=True)
             model.eval()
 
             self.model = model
@@ -93,7 +78,7 @@ class AIService:
 
     def preprocess_image(self, image_bytes: bytes) -> torch.Tensor:
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-        tensor = self.transform(image).unsqueeze(0)  # [1,3,224,224]
+        tensor = self.transform(image).unsqueeze(0)
         return tensor.to(self.device)
 
     def predict(self, image_bytes: bytes) -> Tuple[str, float, float]:
@@ -107,24 +92,20 @@ class AIService:
             x = self.preprocess_image(image_bytes)
 
             with torch.inference_mode():
-                logits = self.model(x)              # [1, C]
-                probs = F.softmax(logits, dim=1)    # [1, C]
+                logits = self.model(x)
+                probs = F.softmax(logits, dim=1)
                 conf, pred = torch.max(probs, dim=1)
 
             conf = float(conf.item())
             pred = int(pred.item())
-
-            # map label theo class_names
-            # ví dụ class_names=["Healthy","WSSV"] (index 0/1)
-            label = self.class_names[pred]
+            label = self.class_names[pred] if pred < len(self.class_names) else str(pred)
 
         except Exception as e:
             logger.error(f"Prediction error: {e}", exc_info=True)
-            label, confidence = self._mock_predict()
+            label, conf = self._mock_predict()
 
         processing_time = time.time() - start_time
-        return label, conf if self.model is not None else confidence, processing_time
+        return label, conf, processing_time
 
     def _mock_predict(self) -> Tuple[str, float]:
-        # fallback
         return "Healthy", 0.85
