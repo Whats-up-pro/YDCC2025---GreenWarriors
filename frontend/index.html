@@ -38,6 +38,17 @@
   <meta name="theme-color" content="#0369A1" media="(prefers-color-scheme: dark)" />
 
   <title>Phát hiện bệnh tôm - ShrimpDetect</title>
+  
+  <!-- Eruda Console (Mobile Debugging) - Remove in production -->
+  <script>
+    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      // Load Eruda for remote debugging
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/eruda';
+      script.onload = function() { window.eruda.init(); };
+      document.head.appendChild(script);
+    }
+  </script>
 </head>
 
 <body>

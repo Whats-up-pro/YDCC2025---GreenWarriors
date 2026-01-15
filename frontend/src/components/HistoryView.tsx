@@ -1,16 +1,28 @@
 import { useState, useEffect } from 'react';
-import { dbHelpers, DetectionRecord } from '../db/database';
+import { dbHelpers, DetectionRecord, waitForDatabase, getDatabaseError } from '../db/database';
 import { syncService } from '../services/syncService';
 
 export const HistoryView = () => {
     const [records, setRecords] = useState<DetectionRecord[]>([]);
     const [stats, setStats] = useState({ total: 0, healthy: 0, wsd: 0, pending: 0 });
     const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
     const [isOnline, setIsOnline] = useState(navigator.onLine);
     const [thumbnailUrls, setThumbnailUrls] = useState<Map<number, string>>(new Map());
 
+    // Check IndexedDB availability
     useEffect(() => {
+        console.log('🔍 HistoryView mounted');
+        
+        // Check if IndexedDB is available
+        if (!window.indexedDB) {
+            console.error('❌ IndexedDB not available');
+            setError('Trình duyệt không hỗ trợ lưu trữ dữ liệu. Vui lòng sử dụng trình duyệt khác hoặc tắt chế độ riêng tư.');
+            setIsLoading(false);
+            return;
+        }
+        
         loadData();
 
         const handleOnline = () => setIsOnline(true);
@@ -19,6 +31,7 @@ export const HistoryView = () => {
         window.addEventListener('offline', handleOffline);
 
         return () => {
+            console.log('🧹 HistoryView unmounting');
             window.removeEventListener('online', handleOnline);
             window.removeEventListener('offline', handleOffline);
             // Cleanup all Blob URLs
@@ -28,8 +41,21 @@ export const HistoryView = () => {
 
     const loadData = async () => {
         setIsLoading(true);
+        setError(null);
         try {
             console.log('🔄 Loading history data...');
+            
+            // Wait for database initialization
+            try {
+                console.log('⏳ Waiting for database...');
+                await waitForDatabase();
+                console.log('✅ Database ready');
+            } catch (dbError) {
+                const error = getDatabaseError();
+                console.error('❌ Database init failed:', error);
+                throw new Error(`Không thể khởi tạo database: ${error?.message || 'Unknown error'}`);
+            }
+            
             const [fetchedRecords, fetchedStats] = await Promise.all([
                 dbHelpers.getDetections(50),
                 dbHelpers.getStats()
@@ -40,17 +66,18 @@ export const HistoryView = () => {
             
             // Create Blob URLs for thumbnails
             const urlMap = new Map<number, string>();
-            fetchedRecords.forEach(record => {
-                if (record.id && record.imageThumbnail) {
-                    try {
-                        const url = URL.createObjectURL(record.imageThumbnail);
-                        urlMap.set(record.id, url);
-                        console.log(`✅ Created URL for record #${record.id}`);
-                    } catch (err) {
-                        console.error(`❌ Failed to create thumbnail URL for record #${record.id}:`, err);
+            if (fetchedRecords && fetchedRecords.length > 0) {
+                fetchedRecords.forEach(record => {
+                    if (record.id && record.imageThumbnail) {
+                        try {
+                            const url = URL.createObjectURL(record.imageThumbnail);
+                            urlMap.set(record.id, url);
+                        } catch (err) {
+                            console.error(`❌ Failed to create thumbnail URL for record #${record.id}:`, err);
+                        }
                     }
-                }
-            });
+                });
+            }
             
             console.log('🖼️ Created', urlMap.size, 'thumbnail URLs');
             
@@ -58,10 +85,12 @@ export const HistoryView = () => {
             thumbnailUrls.forEach(url => URL.revokeObjectURL(url));
             
             setThumbnailUrls(urlMap);
-            setRecords(fetchedRecords);
-            setStats(fetchedStats);
-        } catch (error) {
+            setRecords(fetchedRecords || []);
+            setStats(fetchedStats || { total: 0, healthy: 0, wsd: 0, pending: 0 });
+        } catch (error: any) {
             console.error('❌ Failed to load history:', error);
+            console.error('Error stack:', error?.stack);
+            setError(error?.message || 'Không thể tải lịch sử. Vui lòng thử lại.');
         } finally {
             setIsLoading(false);
         }
@@ -93,8 +122,24 @@ export const HistoryView = () => {
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center h-64">
+            <div className="flex flex-col items-center justify-center h-64 gap-4">
                 <div className="animate-spin-slow text-2xl text-[var(--color-text-muted)]">⏳</div>
+                <p className="text-sm text-[var(--color-text-secondary)]">Đang tải lịch sử...</p>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div className="flex flex-col items-center justify-center h-64 gap-4 p-4">
+                <div className="text-4xl">❌</div>
+                <p className="text-center text-[var(--color-text-secondary)]">{error}</p>
+                <button 
+                    onClick={loadData}
+                    className="btn btn-primary"
+                >
+                    Thử lại
+                </button>
             </div>
         );
     }

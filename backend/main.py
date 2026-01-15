@@ -42,7 +42,29 @@ async def dynamic_cors_middleware(request: Request, call_next):
     """Custom CORS middleware with wildcard support."""
     origin = request.headers.get("origin")
     
-    # Process request
+    # Log for debugging
+    logger.info(f"Request: {request.method} {request.url.path} from origin: {origin}")
+    
+    # Handle preflight OPTIONS request
+    if request.method == "OPTIONS":
+        if origin and is_allowed_origin(origin):
+            logger.info(f"✅ OPTIONS allowed for origin: {origin}")
+            return JSONResponse(
+                content={},
+                status_code=200,
+                headers={
+                    "Access-Control-Allow-Origin": origin,
+                    "Access-Control-Allow-Credentials": "true",
+                    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                    "Access-Control-Allow-Headers": "*",
+                    "Access-Control-Max-Age": "600",
+                }
+            )
+        else:
+            logger.warning(f"❌ OPTIONS rejected for origin: {origin}")
+            return JSONResponse(content={"detail": "Origin not allowed"}, status_code=403)
+    
+    # Process normal request
     response = await call_next(request)
     
     # Add CORS headers if origin is allowed
@@ -51,10 +73,6 @@ async def dynamic_cors_middleware(request: Request, call_next):
         response.headers["Access-Control-Allow-Credentials"] = "true"
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
         response.headers["Access-Control-Allow-Headers"] = "*"
-    
-    # Handle preflight
-    if request.method == "OPTIONS":
-        response.headers["Access-Control-Max-Age"] = "600"
     
     return response
 

@@ -1,10 +1,10 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { syncService } from './services/syncService';
+import { HistoryView } from './components/HistoryView'; // Eager load to avoid network issues
 
-// ⚡ PERFORMANCE: Lazy load heavy components
+// ⚡ PERFORMANCE: Lazy load heavy components (except HistoryView - preloaded)
 const CameraScanner = lazy(() => import('./components/CameraScanner').then(m => ({ default: m.CameraScanner })));
 const ChatUI = lazy(() => import('./components/ChatUI').then(m => ({ default: m.ChatUI })));
-const HistoryView = lazy(() => import('./components/HistoryView').then(m => ({ default: m.HistoryView })));
 
 type TabType = 'detect' | 'history' | 'chat';
 
@@ -13,6 +13,24 @@ function App() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   useEffect(() => {
+    // Clean tracking parameters from URL (fbclid, utm_*, etc.)
+    const url = new URL(window.location.href);
+    const trackingParams = ['fbclid', 'gclid', 'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content'];
+    let hasTrackingParams = false;
+    
+    trackingParams.forEach(param => {
+      if (url.searchParams.has(param)) {
+        url.searchParams.delete(param);
+        hasTrackingParams = true;
+      }
+    });
+    
+    // Replace URL without tracking params (without page reload)
+    if (hasTrackingParams) {
+      console.log('🧹 Cleaned tracking parameters from URL');
+      window.history.replaceState({}, '', url.pathname + url.search + url.hash);
+    }
+    
     syncService.startAutoSync();
 
     const handleOnline = () => setIsOnline(true);
@@ -137,11 +155,9 @@ function App() {
             <div className="bg-[var(--color-surface)] min-h-[calc(100vh-180px)] border lg:border border-[var(--color-border)] lg:rounded-2xl overflow-hidden">
               {/* ⚡ PERFORMANCE: Suspense wrapper for lazy loaded components */}
               <Suspense fallback={
-                <div className="flex items-center justify-center h-64" role="status" aria-live="polite">
-                  <div className="text-center">
-                    <div className="text-2xl mb-2 animate-pulse">⏳</div>
-                    <p className="text-sm text-[var(--color-text-secondary)]">Đang tải...</p>
-                  </div>
+                <div className="flex flex-col items-center justify-center h-64 gap-3" role="status" aria-live="polite">
+                  <div className="w-12 h-12 border-4 border-[var(--color-leaf)] border-t-transparent rounded-full animate-spin"></div>
+                  <p className="text-sm text-[var(--color-text-secondary)]">Đang tải...</p>
                 </div>
               }>
                 {activeTab === 'detect' && (

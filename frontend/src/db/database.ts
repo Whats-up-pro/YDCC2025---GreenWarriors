@@ -118,10 +118,40 @@ class ShrimpDatabase extends Dexie {
 
 export const db = new ShrimpDatabase();
 
+// Database initialization promise for waiting
+let dbInitialized = false;
+let dbInitError: Error | null = null;
+
 // Initialize database
-db.open().catch((err) => {
-    console.error('Failed to open IndexedDB:', err);
-});
+const dbInitPromise = db.open()
+    .then(() => {
+        console.log('✅ IndexedDB opened successfully');
+        console.log('📊 Database version:', db.verno);
+        console.log('📦 Tables:', Object.keys(db.tables));
+        dbInitialized = true;
+        return true;
+    })
+    .catch((err) => {
+        console.error('❌ Failed to open IndexedDB:', err);
+        console.error('Error name:', err.name);
+        console.error('Error message:', err.message);
+        
+        dbInitError = err;
+        
+        // Show user-friendly error
+        if (err.name === 'QuotaExceededError') {
+            console.error('💾 Storage quota exceeded! Clear some data.');
+        } else if (err.name === 'VersionError') {
+            console.error('🔄 Database version mismatch. Consider clearing data.');
+        }
+        
+        throw err; // Re-throw to make promise reject
+    });
+
+// Export init status
+export const isDatabaseReady = () => dbInitialized;
+export const getDatabaseError = () => dbInitError;
+export const waitForDatabase = () => dbInitPromise;
 
 // Helper functions
 export const dbHelpers = {
@@ -150,11 +180,19 @@ export const dbHelpers = {
 
     // Get all detections (most recent first)
     async getDetections(limit = 50): Promise<DetectionRecord[]> {
-        return await db.detections
-            .orderBy('timestamp')
-            .reverse()
-            .limit(limit)
-            .toArray();
+        try {
+            console.log('🔍 Getting detections, limit:', limit);
+            const records = await db.detections
+                .orderBy('timestamp')
+                .reverse()
+                .limit(limit)
+                .toArray();
+            console.log('✅ Found', records.length, 'records');
+            return records;
+        } catch (error) {
+            console.error('❌ Error getting detections:', error);
+            throw error;
+        }
     },
 
     // Get unsynced detections
@@ -240,13 +278,24 @@ export const dbHelpers = {
         wsd: number;
         pending: number;
     }> {
-        const all = await db.detections.toArray();
-        return {
-            total: all.length,
-            healthy: all.filter(r => r.label === 'Healthy').length,
-            wsd: all.filter(r => r.label === 'WSD').length,
-            pending: all.filter(r => !r.synced).length
-        };
+        try {
+            console.log('📊 Getting stats...');
+            const all = await db.detections.toArray();
+            console.log('📈 Total records in DB:', all.length);
+            
+            const stats = {
+                total: all.length,
+                healthy: all.filter(r => r.label === 'Healthy').length,
+                wsd: all.filter(r => r.label === 'WSD').length,
+                pending: all.filter(r => !r.synced).length
+            };
+            
+            console.log('✅ Stats:', stats);
+            return stats;
+        } catch (error) {
+            console.error('❌ Error getting stats:', error);
+            throw error;
+        }
     },
 
     // Get or create app state

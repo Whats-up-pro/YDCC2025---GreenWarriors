@@ -7,9 +7,10 @@ import axios from 'axios';
  * 3. Fallback to localhost:8000
  */
 function getApiBaseUrl(): string {
-  // 1. Check env var first
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
+  // 1. Check env var first (must be non-empty)
+  const envApiUrl = import.meta.env.VITE_API_URL;
+  if (envApiUrl && envApiUrl.trim() !== '') {
+    return envApiUrl;
   }
   
   // 2. If on DevTunnels, auto-detect backend URL

@@ -60,7 +60,9 @@ export default defineConfig({
           }
         ],
         navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/api\//]
+        navigateFallbackDenylist: [/^\/api\//],
+        // Ignore URL query parameters for caching
+        ignoreURLParametersMatching: [/^fbclid$/, /^gclid$/, /^utm_/]
       },
       devOptions: {
         enabled: true,
