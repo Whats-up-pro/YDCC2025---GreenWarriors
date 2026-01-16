@@ -1,7 +1,7 @@
 {
-  "name": "Phát hiện bệnh tôm",
-  "short_name": "ShrimpDetect",
-  "description": "Ứng dụng phát hiện bệnh tôm bằng AI cho người dân Đồng bằng sông Cửu Long",
+  "name": "TOMI - AI Detection System",
+  "short_name": "TOMI",
+  "description": "AI-powered detection system for aquaculture in Mekong Delta",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

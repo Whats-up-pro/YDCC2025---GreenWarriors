@@ -65,8 +65,8 @@ function App() {
                 🦐
               </div>
               <div>
-                <h1 className="text-[var(--color-shrimp)] text-xl lg:text-2xl font-bold">ShrimpDetect</h1>
-                <p className="hidden lg:block text-xs text-[var(--color-text-secondary)]">Hệ thống phát hiện bệnh tôm thông minh</p>
+                <h1 className="text-[var(--color-shrimp)] text-xl lg:text-2xl font-bold">TOMI</h1>
+                <p className="hidden lg:block text-xs text-[var(--color-text-secondary)]">AI Detection System</p>
               </div>
             </div>
             <div 

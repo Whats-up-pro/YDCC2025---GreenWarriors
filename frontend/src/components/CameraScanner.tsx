@@ -109,7 +109,7 @@ export const CameraScanner = () => {
   };
 
   const getLabelVietnamese = (label: string) => {
-    return label === 'WSD' ? 'Bệnh đốm trắng' : 'Khỏe mạnh';
+    return label === 'WSSV' ? 'Bệnh đốm trắng' : 'Khỏe mạnh';
   };
 
   return (

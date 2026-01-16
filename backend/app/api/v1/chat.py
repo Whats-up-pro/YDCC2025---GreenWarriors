@@ -149,7 +149,7 @@ Trả lời ngắn gọn, súc tích trong 2-3 đoạn văn."""
                 
                 # Call Gemini API with correct model name
                 response = gemini_model.models.generate_content(
-                    model='gemini-2.5-flash',
+                    model='embedding-gecko-001',
                     contents=prompt
                 )
                 response_text = response.text
