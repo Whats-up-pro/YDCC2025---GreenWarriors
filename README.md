@@ -1,8 +1,8 @@
-# Shrimp Disease Detection System
+# TOMI - AI Detection System
 
 ## Overview
 
-The Shrimp Disease Detection System is an AI-powered application designed to help farmers in the Mekong Delta region detect White Spot Disease (WSD) in shrimp through image analysis. The system is built with an AI-centric architecture, focusing on inference performance and rapid deployment capabilities.
+TOMI is an AI-powered detection system designed to help farmers in the Mekong Delta region detect White Spot Disease (WSD) in shrimp through image analysis. The system is built with an AI-centric architecture, focusing on inference performance and rapid deployment capabilities.
 
 ## Key Features
 
