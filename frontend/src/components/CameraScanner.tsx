@@ -1,124 +1,215 @@
-import { useRef, useState, useEffect } from 'react';
-import { useAI } from '../hooks/useAI';
-import { dbHelpers } from '../db/database';
-import { aiService } from '../services/aiService';
+import { useRef, useState, useEffect } from "react";
+import { useAI } from "../hooks/useAI";
+import { dbHelpers } from "../db/database";
+import { aiService } from "../services/aiService";
+
+type ResultState = {
+  label: string;
+  confidence: number;
+  source?: "local" | "server";
+} | null;
 
 export const CameraScanner = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [preview, setPreview] = useState<string | null>(null);
-  const [result, setResult] = useState<{
-    label: string;
-    confidence: number;
-    source?: 'local' | 'server';
-  } | null>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+
+  // Preview dùng chung cho ảnh/video bằng Object URL (nhẹ RAM hơn DataURL)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewType, setPreviewType] = useState<"image" | "video" | null>(null);
+
+  const [result, setResult] = useState<ResultState>(null);
   const [savedToHistory, setSavedToHistory] = useState(false);
+
   const { detectDisease, loading, error } = useAI();
+
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
+  // Online/offline listener
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
     };
   }, []);
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Cleanup objectURL tránh leak bộ nhớ
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
+
+  const resetFileInputs = () => {
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (videoInputRef.current) videoInputRef.current.value = "";
+  };
+
+  const handleReset = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(null);
+    setPreviewType(null);
+    setResult(null);
+    setSavedToHistory(false);
+    resetFileInputs();
+  };
+
+  const getLabelVietnamese = (label: string) => {
+    // Bạn đang dùng WSSV ở chỗ khác; phần UI cũ check WSD/WSD -> giữ logic gọn:
+    if (label === "WSSV" || label === "WSD") return "Bệnh đốm trắng";
+    if (label === "Unknown") return "Chưa xác định";
+    return "Khỏe mạnh";
+  };
+
+  // =========================
+  // IMAGE FLOW (giữ offline-first cũ)
+  // =========================
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setResult(null);
     setSavedToHistory(false);
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setPreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    // Preview ảnh
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    setPreviewType("image");
 
     try {
-      // 🎯 OFFLINE-FIRST: Save to IndexedDB IMMEDIATELY (không chờ server)
+      // OFFLINE-FIRST: Save to IndexedDB IMMEDIATELY
       const thumbnailBlob = await aiService.createThumbnail(file);
       const tempId = await dbHelpers.saveDetection(
         file, // Full image Blob
         thumbnailBlob, // Thumbnail Blob
-        'Unknown', // Temporary label
+        "Unknown", // Temporary label
         0, // Temporary confidence
         false, // Local inference = false (pending)
         0 // No processing time yet
       );
       setSavedToHistory(true);
 
-      // Show pending state
+      // Pending UI
       setResult({
-        label: 'Đang phân tích...',
+        label: "Đang phân tích...",
         confidence: 0,
-        source: 'local'
+        source: "local",
       });
 
-      // 🌐 Try server detection (không block UI)
+      // Try server detection (không block UI)
       if (isOnline) {
         try {
           const detectionResult = await detectDisease(file);
-          
-          // Update IndexedDB với kết quả từ server
+
+          // Update IndexedDB synced
           await dbHelpers.markSynced(tempId);
-          // TODO: Add updateDetection method to update label/confidence
-          
+          // TODO: update label/confidence in db nếu bạn có hàm updateDetection
+
           setResult({
             label: detectionResult.label,
             confidence: detectionResult.confidence,
-            source: 'server'
+            source: "server",
           });
         } catch (serverErr) {
-          console.warn('Server detection failed, queued for sync:', serverErr);
+          console.warn("Server detection failed, queued for sync:", serverErr);
           setResult({
-            label: 'Chờ đồng bộ',
+            label: "Chờ đồng bộ",
             confidence: 0,
-            source: 'local'
+            source: "local",
           });
         }
       } else {
-        // Offline: Show queued message
         setResult({
-          label: 'Đã lưu - Chờ đồng bộ',
+          label: "Đã lưu - Chờ đồng bộ",
           confidence: 0,
-          source: 'local'
+          source: "local",
         });
       }
     } catch (err) {
-      console.error('Lỗi lưu ảnh:', err);
+      console.error("Lỗi lưu ảnh:", err);
       setResult({
-        label: 'Lỗi',
+        label: "Lỗi",
         confidence: 0,
-        source: 'local'
+        source: "local",
       });
     }
   };
 
-  const handleReset = () => {
-    setPreview(null);
+  // =========================
+  // VIDEO FLOW (upload video)
+  // =========================
+  const handleVideoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
     setResult(null);
     setSavedToHistory(false);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
 
-  const getLabelVietnamese = (label: string) => {
-    return label === 'WSSV' ? 'Bệnh đốm trắng' : 'Khỏe mạnh';
+    // Preview video
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    setPreviewType("video");
+
+    try {
+      // Trạng thái pending
+      setResult({
+        label: "Đang tải video...",
+        confidence: 0,
+        source: "local",
+      });
+
+      // Offline: hiện trạng thái chờ
+      if (!isOnline) {
+        setResult({
+          label: "Đã chọn video - Chờ mạng để upload",
+          confidence: 0,
+          source: "local",
+        });
+        return;
+      }
+
+      // Upload lên server
+      // YÊU CẦU: aiService.uploadVideo(file) phải tồn tại và dùng FormData field "video"
+      const uploadRes = await aiService.uploadVideo(file);
+
+      // Thành công
+      setSavedToHistory(true);
+
+      // Nếu bạn có endpoint phân tích video, bạn gọi tiếp ở đây bằng uploadRes.url
+      // Ví dụ:
+      // const videoDetection = await aiService.detectDiseaseFromVideo(uploadRes.url)
+      // setResult({ label: videoDetection.label, confidence: videoDetection.confidence, source: "server" })
+
+      setResult({
+        label: "Đã upload video",
+        confidence: 1,
+        source: "server",
+      });
+
+      // (tuỳ chọn) log url để test
+      console.log("Uploaded video URL:", uploadRes?.url);
+    } catch (err: any) {
+      console.error("Upload video lỗi:", err);
+      setResult({
+        label: err?.message || "Lỗi upload video",
+        confidence: 0,
+        source: "local",
+      });
+    }
   };
 
   return (
     <div className="p-4 safe-bottom">
       {/* Offline Banner */}
       {!isOnline && (
-        <div 
-          className="mb-4 p-3 bg-amber-50 border border-amber-200 text-amber-800 text-sm" 
-          style={{ borderRadius: '12px' }}
+        <div
+          className="mb-4 p-3 bg-amber-50 border border-amber-200 text-amber-800 text-sm"
+          style={{ borderRadius: "12px" }}
           role="status"
           aria-live="polite"
         >
@@ -126,71 +217,111 @@ export const CameraScanner = () => {
         </div>
       )}
 
+      {/* INPUT: IMAGE */}
       <input
         ref={fileInputRef}
         type="file"
         accept="image/*"
         capture="environment"
-        onChange={handleFileSelect}
+        onChange={handleImageSelect}
+        className="hidden"
+      />
+
+      {/* INPUT: VIDEO */}
+      <input
+        ref={videoInputRef}
+        type="file"
+        accept="video/*"
+        onChange={handleVideoSelect}
         className="hidden"
       />
 
       {/* Empty State */}
-      {!preview && (
+      {!previewUrl && (
         <div className="py-12 lg:py-20 text-center">
           <div className="mb-6 lg:mb-8">
             <div
               className="w-20 h-20 lg:w-32 lg:h-32 mx-auto mb-4 lg:mb-6 flex items-center justify-center bg-orange-50 text-[var(--color-shrimp)]"
-              style={{ borderRadius: '20px' }} /* iOS 20px large icon container */
+              style={{ borderRadius: "20px" }}
               role="img"
               aria-label="Biểu tượng máy ảnh"
             >
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true" className="lg:w-16 lg:h-16">
+              <svg
+                width="40"
+                height="40"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                aria-hidden="true"
+                className="lg:w-16 lg:h-16"
+              >
                 <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
                 <circle cx="12" cy="13" r="4" />
               </svg>
             </div>
             <h2 className="text-lg lg:text-2xl font-semibold text-[var(--color-text)] mb-1 lg:mb-2">
-              Chụp ảnh để chẩn đoán
+              Chụp ảnh / Upload video để chẩn đoán
             </h2>
             <p className="text-sm lg:text-base text-[var(--color-text-secondary)]">
-              Chụp rõ nét vùng nghi ngờ bệnh trên tôm
+              Ảnh: chụp rõ nét vùng nghi ngờ. Video: chọn file video từ máy.
             </p>
           </div>
 
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={loading}
-            className="btn btn-primary btn-lg w-full sm:w-auto sm:min-w-[200px] lg:min-w-[280px] lg:text-lg"
-            aria-label="Mở camera để chụp ảnh tôm"
-            aria-busy={loading}
-          >
-            {loading ? 'Đang xử lý...' : 'Chụp ảnh tôm'}
-          </button>
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={loading}
+              className="btn btn-primary btn-lg w-full sm:w-auto sm:min-w-[200px] lg:min-w-[280px] lg:text-lg"
+              aria-label="Mở camera để chụp ảnh tôm"
+              aria-busy={loading}
+            >
+              {loading ? "Đang xử lý..." : "Chụp ảnh tôm"}
+            </button>
+
+            <button
+              onClick={() => videoInputRef.current?.click()}
+              disabled={loading}
+              className="btn btn-ghost btn-lg w-full sm:w-auto sm:min-w-[200px] lg:min-w-[280px] lg:text-lg"
+              aria-label="Chọn video để upload"
+              aria-busy={loading}
+            >
+              Upload video
+            </button>
+          </div>
         </div>
       )}
 
       {/* Preview and Results */}
-      {preview && (
+      {previewUrl && (
         <div className="space-y-4 lg:space-y-6">
-          {/* Image */}
+          {/* Preview */}
           <div className="relative lg:max-w-2xl lg:mx-auto">
-            <img
-              src={preview}
-              alt="Ảnh tôm đã chụp để phân tích"
-              className="w-full border border-[var(--color-border)]"
-              style={{ borderRadius: '16px' }} /* iOS 16px card radius */
-            />
-            {loading && (
+            {previewType === "image" ? (
+              <img
+                src={previewUrl}
+                alt="Ảnh tôm đã chụp để phân tích"
+                className="w-full border border-[var(--color-border)]"
+                style={{ borderRadius: "16px" }}
+              />
+            ) : (
+              <video
+                src={previewUrl}
+                controls
+                className="w-full border border-[var(--color-border)]"
+                style={{ borderRadius: "16px" }}
+              />
+            )}
+
+            {loading && previewType === "image" && (
               <div
                 className="absolute inset-0 bg-black/50 flex items-center justify-center"
-                style={{ borderRadius: '16px' }}
+                style={{ borderRadius: "16px" }}
                 role="status"
                 aria-live="polite"
                 aria-label="Đang phân tích ảnh"
               >
                 <div className="text-white text-center">
-                  {/* iOS-style loading (pulse, not spin) */}
                   <div className="text-4xl lg:text-6xl mb-2 animate-pulse">⏳</div>
                   <p className="text-sm lg:text-base font-medium">Đang phân tích...</p>
                 </div>
@@ -201,44 +332,60 @@ export const CameraScanner = () => {
           {/* Result */}
           {result && (
             <div
-              className={`p-4 border-l-4 ${result.label === 'WSD'
-                  ? 'bg-red-50 border-red-500'
-                  : 'bg-green-50 border-green-500'
-                }`}
-              style={{ borderRadius: '12px' }} /* iOS 12px small card */
+              className={`p-4 border-l-4 ${
+                result.label === "WSD" || result.label === "WSSV"
+                  ? "bg-red-50 border-red-500"
+                  : "bg-green-50 border-green-500"
+              }`}
+              style={{ borderRadius: "12px" }}
               role="alert"
               aria-live="assertive"
             >
               <div className="flex items-start justify-between mb-2">
                 <div>
-                  <p className={`text-lg font-semibold ${result.label === 'WSD' ? 'text-red-700' : 'text-green-700'
-                    }`}>
+                  <p
+                    className={`text-lg font-semibold ${
+                      result.label === "WSD" || result.label === "WSSV"
+                        ? "text-red-700"
+                        : "text-green-700"
+                    }`}
+                  >
                     {getLabelVietnamese(result.label)}
                   </p>
                   <p className="text-sm text-[var(--color-text-secondary)]">
                     Độ tin cậy: {(result.confidence * 100).toFixed(1)}%
                   </p>
                 </div>
-                <span className={`badge ${result.label === 'WSD' ? 'badge-danger' : 'badge-success'}`}>
+
+                <span
+                  className={`badge ${
+                    result.label === "WSD" || result.label === "WSSV"
+                      ? "badge-danger"
+                      : "badge-success"
+                  }`}
+                >
                   {result.label}
                 </span>
               </div>
 
               {/* Confidence bar */}
-              <div className="w-full h-1.5 bg-gray-200 mt-3" style={{ borderRadius: '2px' }}>
+              <div className="w-full h-1.5 bg-gray-200 mt-3" style={{ borderRadius: "2px" }}>
                 <div
-                  className={`h-1.5 ${result.label === 'WSD' ? 'bg-red-500' : 'bg-green-500'}`}
+                  className={`h-1.5 ${
+                    result.label === "WSD" || result.label === "WSSV" ? "bg-red-500" : "bg-green-500"
+                  }`}
                   style={{
-                    width: `${result.confidence * 100}%`,
-                    borderRadius: '2px'
+                    width: `${Math.max(0, Math.min(1, result.confidence)) * 100}%`,
+                    borderRadius: "2px",
                   }}
                 />
               </div>
 
               {/* Status */}
               <div className="flex items-center gap-2 mt-3 text-xs text-[var(--color-text-muted)]">
-                {result.source === 'server' && <span className="badge badge-info">Server</span>}
+                {result.source === "server" && <span className="badge badge-info">Server</span>}
                 {savedToHistory && <span className="badge badge-success">Đã lưu</span>}
+                {previewType === "video" && <span className="badge badge-warning">Video</span>}
               </div>
             </div>
           )}
@@ -247,7 +394,7 @@ export const CameraScanner = () => {
           {error && (
             <div
               className="p-4 bg-red-50 border border-red-200 text-red-700 text-sm"
-              style={{ borderRadius: '12px' }} /* iOS 12px */
+              style={{ borderRadius: "12px" }}
               role="alert"
               aria-live="assertive"
             >
@@ -258,21 +405,28 @@ export const CameraScanner = () => {
 
           {/* Actions */}
           <div className="flex gap-3">
-            <button 
-              onClick={handleReset} 
-              className="btn btn-ghost flex-1"
-              aria-label="Chụp lại ảnh hiện tại"
-            >
-              Chụp lại
+            <button onClick={handleReset} className="btn btn-ghost flex-1" aria-label="Reset">
+              Làm lại
             </button>
+
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={loading}
               className="btn btn-primary flex-1"
-              aria-label="Chọn ảnh khác từ thư viện"
+              aria-label="Chụp/Chọn ảnh mới"
               aria-busy={loading}
             >
               Ảnh mới
+            </button>
+
+            <button
+              onClick={() => videoInputRef.current?.click()}
+              disabled={loading}
+              className="btn btn-ghost flex-1"
+              aria-label="Chọn video mới"
+              aria-busy={loading}
+            >
+              Video mới
             </button>
           </div>
         </div>

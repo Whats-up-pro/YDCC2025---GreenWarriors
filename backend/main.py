@@ -10,6 +10,8 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import logging
 import re
+from fastapi.staticfiles import StaticFiles
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -22,7 +24,7 @@ app = FastAPI(
     version=settings.APP_VERSION,
     debug=settings.DEBUG
 )
-
+app.mount("/media", StaticFiles(directory="media"), name="media")
 # Add rate limit exception handler
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)

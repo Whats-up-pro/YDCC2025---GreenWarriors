@@ -1,168 +1,200 @@
-import { detectionAPI } from './api';
+import { detectionAPI } from "./api";
 
-// AI Service interface - hỗ trợ cả online và offline inference
+type UploadVideoResponse = {
+  status: string;
+  filename?: string;
+  original_filename?: string;
+  content_type?: string;
+  size_bytes?: number;
+  url?: string;
+};
+
 class AIService {
-    private useLocalModel = false; // Set true khi có TensorFlow.js model
-    private model: unknown = null; // TensorFlow.js model (sẽ implement sau)
-    private isModelLoading = false;
+  private useLocalModel = false;
+  private model: unknown = null;
+  private isModelLoading = false;
 
-    // Check if we should use local inference
-    shouldUseLocalInference(): boolean {
-        return this.useLocalModel && this.model !== null;
+  shouldUseLocalInference(): boolean {
+    return this.useLocalModel && this.model !== null;
+  }
+
+  async loadLocalModel(): Promise<boolean> {
+    if (this.isModelLoading || this.model) return !!this.model;
+
+    this.isModelLoading = true;
+    try {
+      console.log("⚠️ Local AI model not yet implemented");
+      this.useLocalModel = false;
+      return false;
+    } catch (error) {
+      console.error("Failed to load local AI model:", error);
+      return false;
+    } finally {
+      this.isModelLoading = false;
     }
+  }
 
-    // Load TensorFlow.js model (placeholder - sẽ implement khi có model)
-    async loadLocalModel(): Promise<boolean> {
-        if (this.isModelLoading || this.model) return !!this.model;
+  private normalizeLabel(raw: unknown): "Healthy" | "WSSV" {
+    const s = String(raw ?? "").toUpperCase();
+    if (s === "WSSV" || s === "WSD") return "WSSV";
+    return "Healthy";
+  }
 
-        this.isModelLoading = true;
-        try {
-            // TODO: Implement TensorFlow.js model loading
-            // this.model = await tf.loadGraphModel('/models/shrimp_model/model.json');
-            console.log('⚠️ Local AI model not yet implemented');
-            this.useLocalModel = false;
-            return false;
-        } catch (error) {
-            console.error('Failed to load local AI model:', error);
-            return false;
-        } finally {
-            this.isModelLoading = false;
-        }
-    }
+  async predictLocal(_imageElement: HTMLImageElement): Promise<{
+    label: "Healthy" | "WSSV";
+    confidence: number;
+    processingTime: number;
+  }> {
+    const startTime = performance.now();
 
-    // Predict using local model (placeholder)
-    async predictLocal(_imageElement: HTMLImageElement): Promise<{
-        label: 'Healthy' | 'WSD';
-        confidence: number;
-        processingTime: number;
-    }> {
-        const startTime = performance.now();
+    const label: "Healthy" | "WSSV" = Math.random() > 0.5 ? "WSSV" : "Healthy";
+    const mockResult = {
+      label,
+      confidence: 0.7 + Math.random() * 0.25,
+      processingTime: 0,
+    };
 
-        // TODO: Implement actual TensorFlow.js inference
-        // For now, return mock data
-        const mockResult = {
-            label: Math.random() > 0.5 ? 'WSD' as const : 'Healthy' as const,
-            confidence: 0.7 + Math.random() * 0.25,
-            processingTime: performance.now() - startTime
-        };
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    mockResult.processingTime = performance.now() - startTime;
 
-        // Simulate processing time
-        await new Promise(resolve => setTimeout(resolve, 500));
-        mockResult.processingTime = performance.now() - startTime;
+    return mockResult;
+  }
 
-        return mockResult;
-    }
+  async predict(
+    file: File,
+    forceOnline = false
+  ): Promise<{
+    label: "Healthy" | "WSSV";
+    confidence: number;
+    processingTime: number;
+    source: "local" | "server";
+  }> {
+    if (forceOnline || !this.shouldUseLocalInference()) {
+      if (!navigator.onLine) {
+        throw new Error("Không có kết nối mạng. Vui lòng kết nối để sử dụng.");
+      }
 
-    // Main predict function - uses local model if available, otherwise calls API
-    async predict(
-        file: File,
-        forceOnline = false
-    ): Promise<{
-        label: 'Healthy' | 'WSD';
-        confidence: number;
-        processingTime: number;
-        source: 'local' | 'server';
-    }> {
-        // If online and forced, or local model not available, use server
-        if (forceOnline || !this.shouldUseLocalInference()) {
-            if (!navigator.onLine) {
-                throw new Error('Không có kết nối mạng. Vui lòng kết nối để sử dụng.');
-            }
-
-            try {
-                const result = await detectionAPI.detect(file);
-                return {
-                    label: result.label as 'Healthy' | 'WSD',
-                    confidence: result.confidence,
-                    processingTime: result.processing_time, // Map snake_case to camelCase
-                    source: 'server'
-                };
-            } catch (error) {
-                // If server fails and we have local model, try local
-                if (this.shouldUseLocalInference()) {
-                    console.log('Server failed, falling back to local inference');
-                    return this.predictFromFile(file);
-                }
-                throw error;
-            }
-        }
-
-        // Use local inference
-        return this.predictFromFile(file);
-    }
-
-    // Helper to predict from File using local model
-    private async predictFromFile(file: File): Promise<{
-        label: 'Healthy' | 'WSD';
-        confidence: number;
-        processingTime: number;
-        source: 'local';
-    }> {
-        const imageElement = await this.fileToImage(file);
-        const result = await this.predictLocal(imageElement);
+      try {
+        const result = await detectionAPI.detect(file);
         return {
-            ...result,
-            source: 'local'
+          label: this.normalizeLabel(result.label),
+          confidence: result.confidence,
+          processingTime: result.processing_time,
+          source: "server",
         };
-    }
-
-    // Convert File to HTMLImageElement
-    private fileToImage(file: File): Promise<HTMLImageElement> {
-        return new Promise((resolve, reject) => {
-            const img = new Image();
-            img.onload = () => resolve(img);
-            img.onerror = reject;
-            img.src = URL.createObjectURL(file);
-        });
-    }
-
-    // Preprocess image (resize to 224x224) - for future use
-    async preprocessImage(imageElement: HTMLImageElement): Promise<HTMLCanvasElement> {
-        const canvas = document.createElement('canvas');
-        canvas.width = 224;
-        canvas.height = 224;
-        const ctx = canvas.getContext('2d')!;
-        ctx.drawImage(imageElement, 0, 0, 224, 224);
-        return canvas;
-    }
-
-    // Create thumbnail for storage
-    async createThumbnail(file: File, maxSize = 200): Promise<Blob> {
-        const img = await this.fileToImage(file);
-        const canvas = document.createElement('canvas');
-
-        let width = img.width;
-        let height = img.height;
-
-        if (width > height) {
-            if (width > maxSize) {
-                height = height * (maxSize / width);
-                width = maxSize;
-            }
-        } else {
-            if (height > maxSize) {
-                width = width * (maxSize / height);
-                height = maxSize;
-            }
+      } catch (error) {
+        if (this.shouldUseLocalInference()) {
+          console.log("Server failed, falling back to local inference");
+          return this.predictFromFile(file);
         }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d')!;
-        ctx.drawImage(img, 0, 0, width, height);
-
-        // Return Blob instead of data URL for IndexedDB
-        return new Promise((resolve, reject) => {
-            canvas.toBlob(
-                (blob) => {
-                    if (blob) resolve(blob);
-                    else reject(new Error('Failed to create thumbnail'));
-                },
-                'image/jpeg',
-                0.7
-            );
-        });
+        throw error;
+      }
     }
+
+    return this.predictFromFile(file);
+  }
+
+  private async predictFromFile(file: File): Promise<{
+    label: "Healthy" | "WSSV";
+    confidence: number;
+    processingTime: number;
+    source: "local";
+  }> {
+    const imageElement = await this.fileToImage(file);
+    const result = await this.predictLocal(imageElement);
+    return { ...result, source: "local" };
+  }
+
+  private fileToImage(file: File): Promise<HTMLImageElement> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        resolve(img);
+      };
+      img.onerror = (e) => {
+        URL.revokeObjectURL(url);
+        reject(e);
+      };
+      img.src = url;
+    });
+  }
+
+  async preprocessImage(imageElement: HTMLImageElement): Promise<HTMLCanvasElement> {
+    const canvas = document.createElement("canvas");
+    canvas.width = 224;
+    canvas.height = 224;
+    const ctx = canvas.getContext("2d")!;
+    ctx.drawImage(imageElement, 0, 0, 224, 224);
+    return canvas;
+  }
+
+  async createThumbnail(file: File, maxSize = 200): Promise<Blob> {
+    const img = await this.fileToImage(file);
+    const canvas = document.createElement("canvas");
+
+    let width = img.width;
+    let height = img.height;
+
+    if (width > height) {
+      if (width > maxSize) {
+        height = height * (maxSize / width);
+        width = maxSize;
+      }
+    } else {
+      if (height > maxSize) {
+        width = width * (maxSize / height);
+        height = maxSize;
+      }
+    }
+
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d")!;
+    ctx.drawImage(img, 0, 0, width, height);
+
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => (blob ? resolve(blob) : reject(new Error("Failed to create thumbnail"))),
+        "image/jpeg",
+        0.7
+      );
+    });
+  }
+
+  // VIDEO UPLOAD
+  async uploadVideo(file: File): Promise<UploadVideoResponse> {
+    if (!navigator.onLine) {
+      throw new Error("Không có kết nối mạng. Vui lòng kết nối để upload video.");
+    }
+
+    if (file.type && !file.type.startsWith("video/")) {
+      console.warn("File type is not video/*:", file.type);
+    }
+
+    const form = new FormData();
+    form.append("video", file);
+
+    const res = await fetch("/api/v1/push/upload-video", {
+      method: "POST",
+      body: form,
+    });
+
+    if (!res.ok) {
+      // backend có thể trả json hoặc text
+      const text = await res.text().catch(() => "");
+      try {
+        const j = JSON.parse(text);
+        throw new Error(j?.detail || `Upload video failed: ${res.status}`);
+      } catch {
+        throw new Error(text || `Upload video failed: ${res.status}`);
+      }
+    }
+
+    return res.json();
+  }
 }
 
 export const aiService = new AIService();
