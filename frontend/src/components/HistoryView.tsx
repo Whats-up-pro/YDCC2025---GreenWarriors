@@ -148,15 +148,15 @@ export const HistoryView = () => {
         <div className="p-4 safe-bottom">
             {/* Status Bar */}
             <div
-                className={`mb-4 p-3 flex items-center justify-between text-sm ${isOnline ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'
-                    } border`}
-                style={{ borderRadius: '12px' }} /* iOS 12px */
+                className={`mb-4 p-4 flex items-center justify-between text-sm card-modern ${
+                    isOnline ? 'bg-gradient-to-r from-green-50 to-emerald-50' : 'bg-gradient-to-r from-amber-50 to-orange-50'
+                }`}
                 role="status"
                 aria-live="polite"
             >
                 <div className="flex items-center gap-2">
                     <div className={`status-dot ${isOnline ? 'status-dot-online' : 'status-dot-offline'}`} />
-                    <span className={isOnline ? 'text-green-700' : 'text-amber-700'}>
+                    <span className={`font-medium ${isOnline ? 'text-green-700' : 'text-amber-700'}`}>
                         {isOnline ? 'Trực tuyến' : 'Ngoại tuyến'}
                     </span>
                 </div>
@@ -164,83 +164,90 @@ export const HistoryView = () => {
                     <button
                         onClick={handleSync}
                         disabled={!isOnline || isSyncing}
-                        className="btn btn-sm btn-secondary"
+                        className="btn btn-sm btn-primary"
                         aria-label={`Đồng bộ ${stats.pending} bản ghi chưa đồng bộ`}
                         aria-busy={isSyncing}
                     >
-                        {isSyncing ? 'Đang đồng bộ...' : `Đồng bộ (${stats.pending})`}
+                        {isSyncing ? (
+                            <span className="flex items-center gap-2">
+                                <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                                Đang đồng bộ...
+                            </span>
+                        ) : (
+                            `Đồng bộ (${stats.pending})`
+                        )}
                     </button>
                 )}
             </div>
 
             {/* Statistics */}
-            <div className="grid grid-cols-3 gap-2 lg:gap-4 mb-6">
-                <div className="card p-3 lg:p-6 text-center">
-                    <p className="text-2xl lg:text-4xl font-bold text-[var(--color-text)]">{stats.total}</p>
-                    <p className="text-xs lg:text-sm text-[var(--color-text-secondary)] mt-1">Tổng</p>
+            <div className="grid grid-cols-3 gap-3 lg:gap-4 mb-6">
+                <div className="card-modern p-4 lg:p-6 text-center">
+                    <p className="text-2xl lg:text-4xl font-bold text-[var(--color-primary-dark)]">{stats.total}</p>
+                    <p className="text-xs lg:text-sm text-[var(--color-text-secondary)] mt-1 font-medium">Tổng</p>
                 </div>
-                <div className="card p-3 lg:p-6 text-center bg-green-50">
+                <div className="card-modern p-4 lg:p-6 text-center bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
                     <p className="text-2xl lg:text-4xl font-bold text-green-600">{stats.healthy}</p>
-                    <p className="text-xs lg:text-sm text-green-700 mt-1">Khỏe</p>
+                    <p className="text-xs lg:text-sm text-green-700 mt-1 font-medium">Khỏe</p>
                 </div>
-                <div className="card p-3 lg:p-6 text-center bg-red-50">
-                    <p className="text-2xl lg:text-4xl font-bold text-red-600">{stats.wsd}</p>
-                    <p className="text-xs lg:text-sm text-red-700 mt-1">Bệnh</p>
+                <div className="card-modern p-4 lg:p-6 text-center bg-gradient-to-br from-red-50 to-orange-50 border-red-200">
+                    <p className="text-2xl lg:text-4xl font-bold text-[var(--color-accent)]">{stats.wsd}</p>
+                    <p className="text-xs lg:text-sm text-red-700 mt-1 font-medium">Bệnh</p>
                 </div>
             </div>
 
             {/* Records List */}
             {records.length === 0 ? (
-                <div className="text-center py-12 text-[var(--color-text-secondary)]">
-                    <p>Chưa có lịch sử phát hiện</p>
-                    <p className="text-sm mt-1 text-[var(--color-text-muted)]">
-                        Chụp ảnh tôm để bắt đầu
+                <div className="text-center py-16">
+                    <div className="w-20 h-20 mx-auto mb-4 flex items-center justify-center bg-[var(--color-primary-light)] rounded-3xl">
+                        <span className="text-4xl">📋</span>
+                    </div>
+                    <p className="text-lg font-semibold text-[var(--color-text)]">Chưa có lịch sử phát hiện</p>
+                    <p className="text-sm mt-2 text-[var(--color-text-secondary)]">
+                        Chụp ảnh tôm để bắt đầu theo dõi
                     </p>
                 </div>
             ) : (
                 <div>
-                    <h3 className="text-sm lg:text-base font-medium text-[var(--color-text-secondary)] mb-3">
+                    <h3 className="text-base lg:text-lg font-semibold text-[var(--color-text)] mb-4">
                         Lịch sử gần đây
                     </h3>
-                    <div className="space-y-2 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
+                    <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
                     {records.map((record) => {
                         const thumbnailUrl = record.id ? thumbnailUrls.get(record.id) : undefined;
                         
                         return (
                             <div
                                 key={record.id}
-                                className="card p-3 lg:p-4 flex items-center gap-3 lg:gap-4"
+                                className="card-modern p-4 flex items-center gap-4 hover:shadow-medium transition-shadow"
                             >
                                 {thumbnailUrl ? (
                                     <img
                                         src={thumbnailUrl}
                                         alt={`Ảnh phát hiện ${record.label}`}
-                                        className="w-14 h-14 lg:w-20 lg:h-20 object-cover border border-[var(--color-border)]"
-                                        style={{ borderRadius: '12px' }} /* iOS 12px */
+                                        className="w-16 h-16 lg:w-20 lg:h-20 object-cover rounded-xl border-2 border-[var(--color-border-light)]"
                                     />
                                 ) : (
                                     <div 
-                                        className="w-14 h-14 lg:w-20 lg:h-20 bg-gray-100 flex items-center justify-center border border-[var(--color-border)]"
-                                        style={{ borderRadius: '12px' }}
+                                        className="w-16 h-16 lg:w-20 lg:h-20 bg-gradient-to-br from-[var(--color-primary-light)] to-[var(--color-primary-dark)] flex items-center justify-center rounded-xl"
                                     >
-                                        <span className="text-2xl lg:text-3xl">🦐</span>
+                                        <span className="text-3xl lg:text-4xl">🦐</span>
                                     </div>
                                 )}
 
                                 <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className={`badge ${record.label === 'WSD' ? 'badge-danger' : 'badge-success'
-                                            }`}>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className={`badge ${record.label === 'WSD' ? 'badge-danger' : 'badge-success'}`}>
                                             {record.label === 'WSD' ? 'Bệnh' : 'Khỏe'}
                                         </span>
                                         {!record.synced && (
-                                            <span className="badge badge-warning">Chờ đồng bộ</span>
+                                            <span className="badge badge-warning text-xs">Chờ đồng bộ</span>
                                         )}
                                     </div>
-                                    <p className="text-sm lg:text-base text-[var(--color-text-secondary)]">
+                                    <p className="text-sm lg:text-base font-medium text-[var(--color-text)]">
                                         {(record.confidence * 100).toFixed(0)}% tin cậy
                                     </p>
-                                    <p className="text-xs lg:text-sm text-[var(--color-text-muted)]">
+                                    <p className="text-xs lg:text-sm text-[var(--color-text-muted)] mt-1">
                                         {formatDate(new Date(record.timestamp))}
                                     </p>
                                 </div>

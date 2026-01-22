@@ -78,20 +78,19 @@ export const ChatUI = () => {
         {messages.length === 0 && (
           <div className="text-center py-12 lg:py-20">
             <div
-              className="w-16 h-16 lg:w-24 lg:h-24 mx-auto mb-4 lg:mb-6 flex items-center justify-center bg-cyan-50 text-[var(--color-water)]"
-              style={{ borderRadius: '20px' }} /* iOS 20px large icon */
+              className="w-20 h-20 lg:w-28 lg:h-28 mx-auto mb-6 lg:mb-8 flex items-center justify-center gradient-primary rounded-3xl shadow-primary"
               role="img"
               aria-label="Biểu tượng trò chuyện"
             >
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true" className="lg:w-12 lg:h-12">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" aria-hidden="true" className="lg:w-16 lg:h-16">
                 <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
               </svg>
             </div>
-            <p className="text-[var(--color-text-secondary)] lg:text-lg">
+            <h2 className="text-xl lg:text-2xl font-bold text-[var(--color-text)] mb-2">
               Chào mừng đến với hệ thống tư vấn
-            </p>
-            <p className="text-sm lg:text-base text-[var(--color-text-muted)] mt-1">
-              Hỏi về bệnh tôm hoặc cách chăm sóc
+            </h2>
+            <p className="text-sm lg:text-base text-[var(--color-text-secondary)] max-w-md mx-auto">
+              Hỏi về bệnh tôm, cách chăm sóc hoặc bất kỳ thắc mắc nào về nuôi tôm
             </p>
           </div>
         )}
@@ -102,15 +101,15 @@ export const ChatUI = () => {
             className={`flex ${msg.isUser ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[85%] sm:max-w-[75%] lg:max-w-[65%] px-3 py-2 lg:px-4 lg:py-3 text-sm lg:text-base ${msg.isUser
-                  ? 'bg-[var(--color-leaf)] text-white'
-                  : 'bg-[var(--color-border)] text-[var(--color-text)]'
-                }`}
-              style={{ borderRadius: '16px' }} /* iOS 16px message bubble */
+              className={`max-w-[85%] sm:max-w-[75%] lg:max-w-[65%] px-4 py-3 lg:px-5 lg:py-4 text-sm lg:text-base rounded-2xl shadow-soft ${
+                msg.isUser
+                  ? 'gradient-primary text-white'
+                  : 'bg-white border border-[var(--color-border-light)] text-[var(--color-text)]'
+              }`}
               role="article"
               aria-label={msg.isUser ? 'Tin nhắn của bạn' : 'Phản hồi từ hệ thống'}
             >
-              <p className="whitespace-pre-wrap">{msg.text}</p>
+              <p className="whitespace-pre-wrap leading-relaxed">{msg.text}</p>
             </div>
           </div>
         ))}
@@ -118,12 +117,12 @@ export const ChatUI = () => {
         {loading && (
           <div className="flex justify-start">
             <div
-              className="px-3 py-2 bg-[var(--color-border)] text-[var(--color-text-secondary)] text-sm"
-              style={{ borderRadius: '16px' }} /* iOS 16px */
+              className="px-4 py-3 bg-white border border-[var(--color-border-light)] text-[var(--color-text-secondary)] text-sm rounded-2xl shadow-soft flex items-center gap-2"
               role="status"
               aria-live="polite"
             >
-              Đang suy nghĩ...
+              <div className="w-4 h-4 border-2 border-[var(--color-primary-dark)] border-t-transparent rounded-full animate-spin"></div>
+              <span>Đang suy nghĩ...</span>
             </div>
           </div>
         )}
@@ -131,27 +130,34 @@ export const ChatUI = () => {
       </div>
 
       {/* Input */}
-      <div className="border-t border-[var(--color-border)] p-3 safe-bottom bg-[var(--color-surface)]">
-        <div className="flex gap-2">
+      <div className="border-t border-[var(--color-border-light)] p-4 safe-bottom bg-gradient-soft">
+        <div className="flex gap-3">
           <input
             type="text"
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Nhập câu hỏi..."
+            placeholder="Nhập câu hỏi của bạn..."
             disabled={loading}
-            className="input flex-1"
+            className="input flex-1 rounded-xl"
             aria-label="Ô nhập tin nhắn"
             aria-invalid="false"
           />
           <button
             onClick={handleSend}
             disabled={loading || !inputMessage.trim()}
-            className="btn btn-primary"
+            className="btn btn-primary rounded-xl min-w-[80px]"
             aria-label="Gửi tin nhắn"
             aria-busy={loading}
           >
-            Gửi
+            {loading ? (
+              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+            ) : (
+              <span className="flex items-center gap-1">
+                <span>Gửi</span>
+                <span>➤</span>
+              </span>
+            )}
           </button>
         </div>
       </div>

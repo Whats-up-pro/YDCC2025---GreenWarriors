@@ -2,25 +2,28 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Custom Design System - Green Warriors */
+/* Custom Design System - Modern Shrimp Community */
 :root {
-  /* Primary Colors */
-  --color-leaf: #2D5A27;        /* Xanh lá đậm - chính */
-  --color-leaf-light: #4A7C42;  /* Xanh lá nhạt */
-  --color-water: #1E6B7B;       /* Xanh biển - nước ruộng */
-  --color-water-light: #2A8A9C; /* Xanh biển nhạt */
-  --color-sky: #5BA4C9;         /* Xanh trời */
-  --color-sky-light: #89C4E1;   /* Xanh trời nhạt */
-  --color-shrimp: #E8723A;      /* Cam tôm */
-  --color-shrimp-dark: #C85A28; /* Cam đậm */
+  /* Primary Colors - New Palette */
+  --color-primary-dark: #78b3ce;      /* Xanh đậm - chính */
+  --color-primary-light: #c9e6f0;     /* Xanh nhạt */
+  --color-primary-hover: #6ba3be;     /* Xanh đậm hover */
+  --color-accent: #f96e2a;            /* Cam - accent */
+  --color-accent-hover: #e85d1f;      /* Cam đậm hover */
+  --color-accent-light: #ff8a5c;      /* Cam nhạt */
   
-  /* Neutral Colors */
-  --color-bg: #F7F9FA;
-  --color-surface: #FFFFFF;
-  --color-border: #E2E8F0;
-  --color-text: #1A202C;
-  --color-text-secondary: #64748B;
-  --color-text-muted: #94A3B8;
+  /* Background Colors */
+  --color-bg: #fbf8ef;                /* Trắng kem - background */
+  --color-surface: #ffffff;           /* Trắng - surface */
+  --color-surface-alt: #f5f2e8;       /* Kem nhạt - alternate surface */
+  --color-border: #e0ddd4;            /* Border nhạt */
+  --color-border-light: #f0ede5;      /* Border rất nhạt */
+  
+  /* Text Colors */
+  --color-text: #2c3e50;              /* Text chính - đậm */
+  --color-text-secondary: #5a6c7d;    /* Text phụ */
+  --color-text-muted: #8a9ba8;        /* Text mờ */
+  --color-text-light: #b8c5d1;        /* Text rất nhạt */
   
   /* Status Colors */
   --color-success: #16A34A;
@@ -100,30 +103,39 @@ body {
   }
   
   .btn-primary {
-    background-color: var(--color-leaf);
+    background: linear-gradient(135deg, var(--color-primary-dark) 0%, var(--color-primary-hover) 100%);
     color: white;
+    box-shadow: 0 4px 12px rgba(120, 179, 206, 0.3);
   }
   .btn-primary:hover:not(:disabled) {
-    background-color: var(--color-leaf-light);
+    background: linear-gradient(135deg, var(--color-primary-hover) 0%, var(--color-primary-dark) 100%);
+    box-shadow: 0 6px 16px rgba(120, 179, 206, 0.4);
+    transform: translateY(-1px);
   }
   .btn-primary:focus {
-    @apply ring-green-500;
+    @apply ring-blue-300;
+    ring-color: var(--color-primary-light);
   }
   
   .btn-secondary {
-    background-color: var(--color-water);
-    color: white;
+    background-color: var(--color-primary-light);
+    color: var(--color-primary-dark);
+    border: 1px solid var(--color-primary-dark);
   }
   .btn-secondary:hover:not(:disabled) {
-    background-color: var(--color-water-light);
+    background-color: var(--color-primary-dark);
+    color: white;
   }
   
   .btn-accent {
-    background-color: var(--color-shrimp);
+    background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-hover) 100%);
     color: white;
+    box-shadow: 0 4px 12px rgba(249, 110, 42, 0.3);
   }
   .btn-accent:hover:not(:disabled) {
-    background-color: var(--color-shrimp-dark);
+    background: linear-gradient(135deg, var(--color-accent-hover) 0%, var(--color-accent) 100%);
+    box-shadow: 0 6px 16px rgba(249, 110, 42, 0.4);
+    transform: translateY(-1px);
   }
   
   .btn-ghost {
@@ -161,8 +173,9 @@ body {
     color: var(--color-text);
   }
   .input:focus {
-    border-color: var(--color-water);
-    @apply ring-cyan-200;
+    border-color: var(--color-primary-dark);
+    @apply ring-blue-200;
+    box-shadow: 0 0 0 3px rgba(120, 179, 206, 0.1);
   }
   .input::placeholder {
     color: var(--color-text-muted);
@@ -186,8 +199,35 @@ body {
     color: #B45309;
   }
   .badge-info {
-    background-color: #E0F2FE;
-    color: var(--color-water);
+    background-color: var(--color-primary-light);
+    color: var(--color-primary-dark);
+  }
+  
+  /* Gradient Utilities */
+  .gradient-primary {
+    background: linear-gradient(135deg, var(--color-primary-dark) 0%, var(--color-primary-light) 100%);
+  }
+  
+  .gradient-accent {
+    background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-light) 100%);
+  }
+  
+  .gradient-bg {
+    background: linear-gradient(180deg, var(--color-bg) 0%, var(--color-surface) 100%);
+  }
+  
+  /* Modern Card with Shadow */
+  .card-modern {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04);
+    transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+  }
+  
+  .card-modern:hover {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1), 0 4px 8px rgba(0, 0, 0, 0.06);
+    transform: translateY(-2px);
   }
   
   /* Status Indicator */
