@@ -3,6 +3,7 @@ import { useAI } from "../hooks/useAI";
 import { dbHelpers } from "../db/database";
 import { aiService } from "../services/aiService";
 
+
 type ResultState = {
   label: string;
   confidence: number;
@@ -21,8 +22,12 @@ export const CameraScanner = () => {
   const [savedToHistory, setSavedToHistory] = useState(false);
 
   const { detectDisease, loading, error } = useAI();
-
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
+  const [videoAlert, setVideoAlert] = useState<{
+    level: 1 | 2;
+    reasons: string[];
+    wssvProbMax?: number;
+  } | null>(null);
 
   // Online/offline listener
   useEffect(() => {
@@ -55,6 +60,7 @@ export const CameraScanner = () => {
     setResult(null);
     setSavedToHistory(false);
     resetFileInputs();
+    setVideoAlert(null);
   };
 
   const getLabelVietnamese = (label: string) => {
@@ -147,6 +153,7 @@ export const CameraScanner = () => {
     if (!file) return;
 
     setResult(null);
+    setVideoAlert(null);
     setSavedToHistory(false);
 
     // Preview video
@@ -175,24 +182,54 @@ export const CameraScanner = () => {
 
       // Upload lên server
       // YÊU CẦU: aiService.uploadVideo(file) phải tồn tại và dùng FormData field "video"
-      const uploadRes = await aiService.uploadVideo(file);
+      const { upload, job, metrics, alerts } = await aiService.uploadVideoAndWaitAlert(file);
 
-      // Thành công
+      console.log("Uploaded video URL:", upload?.url);
+      console.log("Metrics JSON:", job?.metrics_json_url || upload?.processed?.metrics_json_url);
+      console.log("Alerts:", alerts);
+
+      if (alerts.highestLevel === 2) {
+        // Level 2: WSSV detected
+        setVideoAlert({
+          level: 2,
+          reasons: alerts.reasons,
+          wssvProbMax: metrics?.windows?.slice(-1)?.[0]?.level2?.features?.wssv_prob_max,
+        });
+
+        setResult({
+          label: "WSSV",
+          confidence: Math.max(
+            0,
+            Math.min(1, metrics?.windows?.slice(-1)?.[0]?.level2?.features?.wssv_prob_max ?? 0.95)
+          ),
+          source: "server",
+        });
+      } else if (alerts.highestLevel === 1) {
+        // Level 1: slow swimming
+        setVideoAlert({
+          level: 1,
+          reasons: alerts.reasons,
+        });
+
+        // UI bạn đang dùng label=WSSV để đỏ -> mình giữ theo logic cũ
+        setResult({
+          label: "WSSV",
+          confidence: 0.9,
+          source: "server",
+        });
+      } else {
+        setVideoAlert(null);
+        setResult({
+          label: "Healthy",
+          confidence: 1,
+          source: "server",
+        });
+      }
+
       setSavedToHistory(true);
 
-      // Nếu bạn có endpoint phân tích video, bạn gọi tiếp ở đây bằng uploadRes.url
-      // Ví dụ:
-      // const videoDetection = await aiService.detectDiseaseFromVideo(uploadRes.url)
-      // setResult({ label: videoDetection.label, confidence: videoDetection.confidence, source: "server" })
-
-      setResult({
-        label: "Đã upload video",
-        confidence: 1,
-        source: "server",
-      });
-
       // (tuỳ chọn) log url để test
-      console.log("Uploaded video URL:", uploadRes?.url);
+      // console.log("Uploaded video URL:", uploadRes?.url);
     } catch (err: any) {
       console.error("Upload video lỗi:", err);
       setResult({
@@ -330,6 +367,38 @@ export const CameraScanner = () => {
           </div>
 
           {/* Result */}
+          {videoAlert && previewType === "video" && (
+            <div
+              className={`p-4 border text-sm ${
+                videoAlert.level === 2
+                  ? "bg-red-50 border-red-200 text-red-900"
+                  : "bg-amber-50 border-amber-200 text-amber-900"
+              }`}
+              style={{ borderRadius: "12px" }}
+              role="alert"
+              aria-live="assertive"
+            >
+              <p className="font-semibold">
+                {videoAlert.level === 2
+                  ? "🚨 Cảnh báo cấp 2 (đốm trắng)"
+                  : "⚠️ Cảnh báo cấp 1 (tôm lờ đờ)"}
+              </p>
+
+              {videoAlert.level === 2 && typeof (videoAlert as any).wssvProbMax === "number" && (
+                <p className="mt-1">
+                  Xác suất WSSV tối đa: {(((videoAlert as any).wssvProbMax as number) * 100).toFixed(1)}%
+                </p>
+              )}
+
+              <ul className="mt-2 list-disc pl-5">
+                {videoAlert.reasons.map((r, idx) => (
+                  <li key={idx}>{r}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+
           {result && (
             <div
               className={`p-4 border-l-4 ${

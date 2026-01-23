@@ -101,7 +101,7 @@ def _run_behavior_pipeline_job(file_id: str, in_path: Path) -> None:
             video_path=str(in_path),
             out_video_path=str(out_video),
             out_json_path=str(out_json),
-            model_weights="yolov8n.pt",
+            model_weights="yolov8s.pt",
             conf=0.25,
             iou=0.5,
             process_fps=10,

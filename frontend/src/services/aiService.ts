@@ -2,17 +2,163 @@ import { detectionAPI } from "./api";
 
 type UploadVideoResponse = {
   status: string;
+  file_id?: string;
   filename?: string;
   original_filename?: string;
   content_type?: string;
   size_bytes?: number;
   url?: string;
+  processed?: {
+    status?: "queued" | "running" | "done" | "failed";
+    job_status_url?: string;
+    annotated_video_url?: string;
+    metrics_json_url?: string;
+    error?: string;
+    result?: any;
+  };
+};
+
+type VideoJobResponse = {
+  status: string;
+  job: {
+    status: "queued" | "running" | "done" | "failed";
+    started_at?: number | null;
+    finished_at?: number | null;
+    error?: string | null;
+    annotated_video_url?: string;
+    metrics_json_url?: string;
+    result?: any;
+  };
+};
+
+type AlertInfo = {
+  level: number;
+  active: boolean;
+  type?: string | null;
+  reasons?: string[];
+  slow_streak?: number;
+  thresholds?: Record<string, any>;
+};
+type Level2Info = {
+  active: boolean;
+  type?: string;
+  reasons?: string[];
+  wssv_streak?: number;
+  thresholds?: Record<string, any>;
+  features?: {
+    wssv_prob_max?: number;
+    wssv_prob_mean?: number;
+  };
+};
+type MetricsJSON = {
+  meta?: any;
+  windows?: Array<{
+    window_index: number;
+    t_end_sec: number;
+    features: {
+      mean_speed_px_s?: number; // <- bạn đang dùng mean_speed trong backend
+      idle_ratio?: number;
+      near_wall_ratio?: number;
+      dispersion_entropy?: number;
+      mean_count?: number;
+    };
+    anomaly_score?: number;
+    alert?: AlertInfo;     // Level 1
+    level2?: Level2Info;   // Level 2
+  }>;
+};
+type VideoAlerts = {
+  level1: AlertInfo | null;
+  level2: Level2Info | null;
+  highestLevel: 0 | 1 | 2;
+  reasons: string[];
 };
 
 class AIService {
   private useLocalModel = false;
   private model: unknown = null;
   private isModelLoading = false;
+  private async sleep(ms: number) {
+    return new Promise((r) => setTimeout(r, ms));
+  }
+  private absolutize(url: string): string {
+    if (!url) return url;
+    // already absolute
+    if (url.startsWith("http://") || url.startsWith("https://")) return url;
+    // already root-relative
+    if (url.startsWith("/")) return url;
+    // make it root-relative
+    return "/" + url;
+  }
+
+  private async pollJob(jobUrl: string, timeoutMs = 120_000, intervalMs = 1000): Promise<VideoJobResponse["job"]> {
+    const start = Date.now();
+
+    while (true) {
+      const res = await fetch(this.absolutize(jobUrl), { method: "GET" });
+      if (!res.ok) {
+        const t = await res.text().catch(() => "");
+        throw new Error(t || `Poll job failed: ${res.status}`);
+      }
+
+      const data = (await res.json()) as VideoJobResponse;
+      const job = data?.job;
+      if (!job) throw new Error("Job response missing job field");
+
+      if (job.status === "done") return job;
+      if (job.status === "failed") throw new Error(job.error || "Video job failed");
+
+      if (Date.now() - start > timeoutMs) {
+        throw new Error("Timeout waiting for video processing");
+      }
+
+      await this.sleep(intervalMs);
+    }
+  }
+
+  private async fetchMetrics(metricsUrl: string): Promise<MetricsJSON> {
+    const res = await fetch(this.absolutize(metricsUrl), { method: "GET" });
+    if (!res.ok) {
+      const t = await res.text().catch(() => "");
+      throw new Error(t || `Fetch metrics failed: ${res.status}`);
+    }
+    return res.json();
+  }
+
+  private extractLatestAlerts(metrics: MetricsJSON): VideoAlerts {
+    const windows = metrics?.windows || [];
+    if (windows.length === 0) {
+      return { level1: null, level2: null, highestLevel: 0, reasons: [] };
+    }
+
+    const last = windows[windows.length - 1];
+    const level1 = last?.alert || null;
+    const level2 = (last as any)?.level2 || null;
+
+    const l2Active = !!(level2 && level2.active);
+    const l1Active = !!(level1 && level1.active);
+
+    if (l2Active) {
+      return {
+        level1,
+        level2,
+        highestLevel: 2,
+        reasons: level2.reasons ?? ["Phát hiện dấu hiệu đốm trắng (Level 2)"],
+      };
+    }
+
+    if (l1Active) {
+      return {
+        level1,
+        level2,
+        highestLevel: 1,
+        reasons: level1.reasons ?? ["Phát hiện bơi chậm dưới ngưỡng (Level 1)"],
+      };
+    }
+
+    return { level1, level2, highestLevel: 0, reasons: [] };
+  }
+
 
   shouldUseLocalInference(): boolean {
     return this.useLocalModel && this.model !== null;
@@ -165,6 +311,31 @@ class AIService {
   }
 
   // VIDEO UPLOAD
+  async uploadVideoAndWaitAlert(file: File): Promise<{
+    upload: UploadVideoResponse;
+    job: VideoJobResponse["job"];
+    metrics: MetricsJSON;
+    alerts: VideoAlerts;
+  }> {
+    const upload = await this.uploadVideo(file);
+
+    const jobUrl =
+      upload?.processed?.job_status_url ||
+      (upload.file_id ? `/api/v1/push/video-job/${upload.file_id}` : "");
+
+    if (!jobUrl) throw new Error("Upload response missing job_status_url / file_id.");
+
+    const job = await this.pollJob(jobUrl);
+
+    const metricsUrl = job.metrics_json_url || upload.processed?.metrics_json_url;
+    if (!metricsUrl) throw new Error("Missing metrics_json_url in job/upload response");
+
+    const metrics = await this.fetchMetrics(metricsUrl);
+    const alerts = this.extractLatestAlerts(metrics);
+
+    return { upload, job, metrics, alerts };
+  }
+
   async uploadVideo(file: File): Promise<UploadVideoResponse> {
     if (!navigator.onLine) {
       throw new Error("Không có kết nối mạng. Vui lòng kết nối để upload video.");
@@ -177,11 +348,10 @@ class AIService {
     const form = new FormData();
     form.append("video", file);
 
-    const res = await fetch("/api/v1/push/upload-video", {
+    const res = await fetch("/api/v1/push/upload-video?process=true&async_mode=true", {
       method: "POST",
       body: form,
     });
-
     if (!res.ok) {
       // backend có thể trả json hoặc text
       const text = await res.text().catch(() => "");
