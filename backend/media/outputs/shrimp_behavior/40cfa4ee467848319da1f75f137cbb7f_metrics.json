@@ -1,0 +1,109 @@
+{
+  "meta": {
+    "video_path": "media\\uploads\\videos\\40cfa4ee467848319da1f75f137cbb7f.mp4",
+    "width": 1920,
+    "height": 1080,
+    "src_fps": 30.0,
+    "process_fps_param": 10,
+    "window_sec": 10,
+    "tracker": "ultralytics_bytetrack",
+    "tracker_cfg": "E:\\YDCC2025\\YDCC2025---GreenWarriors\\myenv\\Lib\\site-packages\\ultralytics\\cfg\\trackers\\bytetrack.yaml",
+    "model_weights": "yolov8s.pt",
+    "conf": 0.25,
+    "iou": 0.5,
+    "imgsz": 960,
+    "level2": {
+      "enabled": true,
+      "device": "cpu",
+      "weights_path": "ml_models/best_cbam_resnet101.pth",
+      "num_classes": 2,
+      "wssv_class_index": 1,
+      "wssv_prob_thres": 0.85,
+      "wssv_consec_windows": 1,
+      "crop_pad": 0.05,
+      "crop_min_side": 16
+    }
+  },
+  "windows": [
+    {
+      "window_index": 0,
+      "t_end_sec": 10.0,
+      "features": {
+        "mean_speed_px_s": 767.4036527188516,
+        "idle_ratio": 0.8387096774193549,
+        "near_wall_ratio": 0.125,
+        "dispersion_entropy": 0.037225842750395255,
+        "mean_count": 1.0966666666666667
+      },
+      "anomaly_score": 0.0,
+      "alert": {
+        "level": 1,
+        "active": true,
+        "type": "SLOW_SWIMMING",
+        "reasons": [
+          "mean_speed_px_s=767.40 < 1000.0 for 1 windows"
+        ],
+        "slow_streak": 1,
+        "thresholds": {
+          "speed_slow_thres_px_s": 1000.0,
+          "slow_consec_windows": 1
+        }
+      },
+      "level2": {
+        "active": true,
+        "type": "WHITE_SPOT",
+        "wssv_streak": 1,
+        "thresholds": {
+          "wssv_prob_thres": 0.85,
+          "wssv_consec_windows": 1
+        },
+        "features": {
+          "wssv_prob_max": 0.9923027753829956,
+          "wssv_prob_mean": 0.06909036282801302
+        },
+        "reasons": [
+          "wssv_prob_max=0.992 >= 0.85 for 1 windows"
+        ]
+      }
+    },
+    {
+      "window_index": 1,
+      "t_end_sec": 10.633333333333333,
+      "features": {
+        "mean_speed_px_s": 909.2555352185708,
+        "idle_ratio": 0.6666666666666666,
+        "near_wall_ratio": 0.1,
+        "dispersion_entropy": 0.09310986219964437,
+        "mean_count": 1.7
+      },
+      "anomaly_score": 0.0,
+      "alert": {
+        "level": 1,
+        "active": true,
+        "type": "SLOW_SWIMMING",
+        "reasons": [
+          "mean_speed_px_s=909.26 < 1000.0 for 2 windows"
+        ],
+        "slow_streak": 2,
+        "thresholds": {
+          "speed_slow_thres_px_s": 1000.0,
+          "slow_consec_windows": 1
+        }
+      },
+      "level2": {
+        "active": false,
+        "type": "WHITE_SPOT",
+        "wssv_streak": 0,
+        "thresholds": {
+          "wssv_prob_thres": 0.85,
+          "wssv_consec_windows": 1
+        },
+        "features": {
+          "wssv_prob_max": 0.2429574429988861,
+          "wssv_prob_mean": 0.038630608390514
+        },
+        "reasons": []
+      }
+    }
+  ]
+}

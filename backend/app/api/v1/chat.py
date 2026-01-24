@@ -14,20 +14,18 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
 
-# Configure Gemini AI (optional, falls back to knowledge base if not configured)
-gemini_model = None
-if settings.GEMINI_API_KEY:
+# Configure OpenAI (optional, falls back to knowledge base if not configured)
+openai_client = None
+if settings.OPENAI_API_KEY:
     try:
-        from google import genai
-        from google.genai import types
+        from openai import OpenAI
         
-        client = genai.Client(api_key=settings.GEMINI_API_KEY)
-        gemini_model = client
-        logger.info("Gemini AI configured (google.genai)")
+        openai_client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        logger.info("OpenAI configured successfully")
     except Exception as e:
-        logger.warning(f"Failed to configure Gemini AI: {e}")
+        logger.warning(f"Failed to configure OpenAI: {e}")
 else:
-    logger.warning("GEMINI_API_KEY not set - using knowledge base only")
+    logger.warning("OPENAI_API_KEY not set - using knowledge base only")
 
 
 def search_knowledge_base(query: str, db, limit: int = 3):
@@ -124,8 +122,8 @@ async def chat(
         # Search knowledge base first
         kb_results = search_knowledge_base(chat_request.message, db)
         
-        # Try Gemini AI if configured
-        if gemini_model:
+        # Try OpenAI if configured
+        if openai_client:
             try:
                 # Build context from knowledge base
                 context = "\n\n".join([
@@ -133,27 +131,39 @@ async def chat(
                     for r in kb_results
                 ]) if kb_results else ""
                 
-                # Build prompt for Gemini
-                prompt = f"""Bạn là chuyên gia tư vấn nuôi tôm. 
-Trả lời câu hỏi dựa trên kiến thức sau (nếu có):
+                # Build system prompt
+                system_prompt = """Bạn là chuyên gia tư vấn nuôi tôm tại Việt Nam. 
+Bạn có kiến thức sâu rộng về:
+- Phát hiện và phòng ngừa bệnh tôm (đặc biệt bệnh đốm trắng WSD/WSSV)
+- Kỹ thuật nuôi tôm thẻ chân trắng, tôm sú
+- Quản lý chất lượng nước ao nuôi
+- Cho ăn và dinh dưỡng tôm
+
+Trả lời ngắn gọn, súc tích, dễ hiểu. Sử dụng emoji phù hợp để tăng tính thân thiện."""
+
+                # Build user message with context
+                user_message = chat_request.message
+                if context:
+                    user_message = f"""Thông tin tham khảo từ cơ sở dữ liệu:
 {context}
 
-Nếu không có thông tin liên quan, hãy dùng kiến thức chung về nuôi tôm.
-
-Câu hỏi: {chat_request.message}
-
-Trả lời ngắn gọn, súc tích trong 2-3 đoạn văn."""
+Câu hỏi của người dùng: {chat_request.message}"""
                 
-                # Call Gemini API with correct model name
-                response = gemini_model.models.generate_content(
-                    model='embedding-gecko-001',
-                    contents=prompt
+                # Call OpenAI API
+                response = openai_client.chat.completions.create(
+                    model="gpt-4o-mini",  # Cost-effective model
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_message}
+                    ],
+                    max_tokens=500,
+                    temperature=0.7
                 )
-                response_text = response.text
-                logger.info(f"Gemini AI response generated ({len(response_text)} chars)")
+                response_text = response.choices[0].message.content
+                logger.info(f"OpenAI response generated ({len(response_text)} chars)")
                 
-            except Exception as gemini_error:
-                logger.error(f"Gemini AI error: {gemini_error}")
+            except Exception as openai_error:
+                logger.error(f"OpenAI error: {openai_error}")
                 # Fallback to knowledge base or generic response
                 if kb_results:
                     response_text = f"Dựa trên kiến thức của chúng tôi:\n\n{kb_results[0]['content']}"
