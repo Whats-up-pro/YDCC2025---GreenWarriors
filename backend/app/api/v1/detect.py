@@ -1,8 +1,7 @@
-from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks, Depends, Request
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends, Request
 from app.models.schemas import DetectionResponse
 from app.models.database import SessionLocal, DetectionLog
 from app.services.ai_service import AIService
-from app.services.n8n_client import N8NClient
 from app.core.config import settings
 from app.core.security import verify_api_key
 from sqlalchemy.exc import SQLAlchemyError
@@ -18,17 +17,12 @@ router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
 
 ai_service = AIService()
-n8n_client = N8NClient()
-
-async def _trigger_n8n_background(detection_data: dict):
-    await n8n_client.log_detection(detection_data)
 
 @router.post("/detect", response_model=DetectionResponse)
 @limiter.limit("10/minute")  # 10 detections per minute per IP
 async def detect_disease(
     request: Request,
     file: UploadFile = File(...),
-    background_tasks: BackgroundTasks = BackgroundTasks(),
     api_key: str = Depends(verify_api_key)
 ):
     """Detect shrimp disease from uploaded image with database logging."""
@@ -94,18 +88,6 @@ async def detect_disease(
             detection_id = detection_log.id
         
         logger.info(f"Saved detection to database: ID={detection_id}")
-        
-        # TRIGGER N8N NOTIFICATION (Background, only for high confidence)
-        if confidence >= settings.MODEL_CONFIDENCE_THRESHOLD:
-            detection_data = {
-                "id": detection_id,
-                "label": label,
-                "confidence": confidence,
-                "processing_time": processing_time,
-                "filename": file.filename
-            }
-            background_tasks.add_task(_trigger_n8n_background, detection_data)
-            logger.debug(f"Scheduled n8n notification for detection {detection_id}")
         
         return DetectionResponse(
             label=label,

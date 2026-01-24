@@ -9,7 +9,6 @@ TOMI is an AI-powered detection system designed to help farmers in the Mekong De
 - **Image-based Disease Detection**: Users capture shrimp images, and the system analyzes and returns results (Healthy/White Spot Disease) with confidence scores
 - **AI Chatbot Consultation**: AI chatbot with OpenAI GPT-3.5-turbo integration and knowledge base fallback
 - **Progressive Web App (PWA)**: Web application that can be installed on mobile devices, functioning like a native app
-- **Workflow Automation**: Integration with n8n for background tasks such as logging and notifications
 - **Database Logging**: All detections automatically saved to PostgreSQL with transaction safety
 - **Advanced Security**: API key authentication, rate limiting, and multi-layer file validation
 - **Knowledge Base Search**: Intelligent search through disease prevention and treatment knowledge
@@ -54,9 +53,6 @@ The backend serves as an API Gateway and AI Inference Wrapper, handling requests
     - Model loading using state_dict (thread-safe)
     - Inference with `torch.inference_mode()` (performance optimized)
     - Image preprocessing: resize, normalize
-  - `n8n_client.py`: Client for calling n8n webhooks
-    - Retry logic with exponential backoff
-    - Async HTTP client with httpx
 
 - **Data Models** (`app/models/`):
   - `database.py`: SQLAlchemy ORM models (User, DetectionLog, MarketPrice, KnowledgeBase)
@@ -68,7 +64,6 @@ The backend serves as an API Gateway and AI Inference Wrapper, handling requests
 
 **Technical Features**:
 - Hot Path optimization: AI inference returns results in < 2 seconds
-- Cold Path: n8n webhooks called via BackgroundTasks (non-blocking)
 - Model loading: Uses state_dict for safe model loading, no class definition required
 - Error handling: Comprehensive error handling with logging and context
 - Database Transactions: All database operations use transactions for data integrity
@@ -76,20 +71,7 @@ The backend serves as an API Gateway and AI Inference Wrapper, handling requests
 - File Validation: 4-layer validation (content-type, extension, size, magic bytes)
 - OpenAI Integration: GPT-3.5-turbo with knowledge base context injection
 
-### 3. Orchestration Layer (n8n)
-
-**Technology**: n8n
-
-n8n functions as a low-code backend for processing logic that doesn't require high performance:
-- Saving detection logs to database
-- Sending notifications when disease is detected
-- Rule engine: Trigger alerts when confidence is high and label is WSD
-- Integration with external services (SMS, Email, etc.)
-
-**Workflow**:
-- `detect_notification`: Receives webhook from backend, saves logs, triggers notifications
-
-### 4. Data Layer (PostgreSQL)
+### 3. Data Layer (PostgreSQL)
 
 **Technology**: PostgreSQL
 
@@ -121,17 +103,6 @@ Database stores the following information:
 
 Processing time: < 2 seconds (including database save)
 
-### Cold Path (Background)
-
-1. After inference, if confidence >= threshold
-2. Backend adds task to BackgroundTasks to call n8n webhook
-3. Response is returned immediately (doesn't wait for n8n)
-4. n8n receives webhook, processes:
-   - Save detection log to PostgreSQL
-   - If confidence is high and label is WSD → Trigger notification
-   - Execute other workflows
-
-Processing time: Background, doesn't affect response time
 
 ## Technology Stack
 
@@ -164,7 +135,6 @@ Processing time: Background, doesn't affect response time
 
 - **Containerization**: Docker, Docker Compose
 - **Web Server**: Nginx (for frontend)
-- **Workflow Automation**: n8n
 - **Database**: PostgreSQL (alpine image)
 
 ## Directory Structure
@@ -176,7 +146,7 @@ code/
 │   │   ├── api/v1/         # API endpoints
 │   │   ├── core/           # Config, security
 │   │   ├── models/         # Database models, schemas
-│   │   └── services/       # Business logic (AI, n8n)
+│   │   └── services/       # Business logic (AI)
 │   ├── db/                 # Database migrations (future)
 │   ├── ml_models/          # AI model weights (.pth files)
 │   ├── tests/              # Unit tests
@@ -194,10 +164,6 @@ code/
 │   ├── public/             # Static assets, manifest
 │   ├── Dockerfile          # Frontend container
 │   └── package.json        # Node dependencies
-│
-├── n8n/                    # n8n workflows
-│   ├── workflows/          # Workflow JSON files
-│   └── n8n_data/           # n8n internal data
 │
 ├── deployments/            # Deployment configs
 │   ├── docker-compose.yml  # Multi-container setup
@@ -237,12 +203,6 @@ DB_MAX_OVERFLOW=20
 MODEL_PATH=ml_models/wsd_model_v1.pth
 MODEL_DEVICE=cpu
 MODEL_CONFIDENCE_THRESHOLD=0.7
-
-# n8n Integration
-N8N_WEBHOOK_URL=http://localhost:5678/webhook/detect
-N8N_TIMEOUT=5
-N8N_MAX_RETRIES=3
-N8N_RETRY_DELAY=1.0
 
 # Security
 API_KEY=your_secure_api_key_here
@@ -289,9 +249,8 @@ docker-compose up -d
 ```
 
 Services will be started:
-- Frontend: http://localhost
+- Frontend: http://localhost:8080
 - Backend API: http://localhost:8000
-- n8n UI: http://localhost:5678
 - PostgreSQL: localhost:5432
 
 ### 6. View Logs
@@ -398,7 +357,6 @@ Chat with AI chatbot (OpenAI GPT-3.5-turbo + Knowledge Base).
 
 ### Reliability
 
-- **Retry Logic**: n8n client has retry with exponential backoff (3 attempts)
 - **Error Handling**: Comprehensive error handling with logging
 - **Validation**: Pydantic schemas for request/response validation
 

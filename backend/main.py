@@ -1,8 +1,10 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 from app.core.config import settings
-from app.api.v1 import detect, chat, sync, push
+from app.api.v1 import detect, chat, sync, push, community
 from app.models.database import engine, SessionLocal
 from sqlalchemy import text
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -30,24 +32,44 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # Dynamic CORS - Accept localhost + any DevTunnels URL
 def is_allowed_origin(origin: str) -> bool:
     """Check if origin is allowed using pattern matching."""
+    if not origin:
+        return False
     allowed_patterns = [
         r"^https?://localhost(:\d+)?$",
         r"^https?://127\.0\.0\.1(:\d+)?$",
+        r"^https?://192\.168\.\d+\.\d+(:\d+)?$",  # Local network IPs
         r"^https?://.*\.devtunnels\.ms$",  # Any DevTunnel subdomain
     ]
-    return any(re.match(pattern, origin) for pattern in allowed_patterns)
+    result = any(re.match(pattern, origin) for pattern in allowed_patterns)
+    # #region agent log
+    import json
+    with open('d:\\YDCC\\code\\.cursor\\debug.log', 'a', encoding='utf-8') as f:
+        f.write(json.dumps({"location":"main.py:40","message":"CORS origin check","data":{"origin":origin,"isAllowed":result},"timestamp":int(__import__('time').time()*1000),"sessionId":"debug-session","runId":"run1","hypothesisId":"B"})+"\n")
+    # #endregion
+    return result
 
 @app.middleware("http")
 async def dynamic_cors_middleware(request: Request, call_next):
     """Custom CORS middleware with wildcard support."""
+    import json
     origin = request.headers.get("origin")
+    
+    # #region agent log
+    with open('d:\\YDCC\\code\\.cursor\\debug.log', 'a', encoding='utf-8') as f:
+        f.write(json.dumps({"location":"main.py:43","message":"CORS middleware entry","data":{"method":request.method,"path":str(request.url.path),"origin":origin},"timestamp":int(__import__('time').time()*1000),"sessionId":"debug-session","runId":"run1","hypothesisId":"B"})+"\n")
+    # #endregion
     
     # Log for debugging
     logger.info(f"Request: {request.method} {request.url.path} from origin: {origin}")
     
     # Handle preflight OPTIONS request
     if request.method == "OPTIONS":
-        if origin and is_allowed_origin(origin):
+        is_allowed = origin and is_allowed_origin(origin)
+        # #region agent log
+        with open('d:\\YDCC\\code\\.cursor\\debug.log', 'a', encoding='utf-8') as f:
+            f.write(json.dumps({"location":"main.py:52","message":"OPTIONS request","data":{"origin":origin,"isAllowed":is_allowed},"timestamp":int(__import__('time').time()*1000),"sessionId":"debug-session","runId":"run1","hypothesisId":"B"})+"\n")
+        # #endregion
+        if is_allowed:
             logger.info(f"✅ OPTIONS allowed for origin: {origin}")
             return JSONResponse(
                 content={},
@@ -68,7 +90,12 @@ async def dynamic_cors_middleware(request: Request, call_next):
     response = await call_next(request)
     
     # Add CORS headers if origin is allowed
-    if origin and is_allowed_origin(origin):
+    is_allowed = origin and is_allowed_origin(origin)
+    # #region agent log
+    with open('d:\\YDCC\\code\\.cursor\\debug.log', 'a', encoding='utf-8') as f:
+        f.write(json.dumps({"location":"main.py:73","message":"CORS headers added","data":{"origin":origin,"isAllowed":is_allowed,"statusCode":response.status_code},"timestamp":int(__import__('time').time()*1000),"sessionId":"debug-session","runId":"run1","hypothesisId":"B"})+"\n")
+    # #endregion
+    if is_allowed:
         response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Credentials"] = "true"
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
@@ -81,6 +108,12 @@ app.include_router(detect.router, prefix="/api/v1", tags=["detection"])
 app.include_router(chat.router, prefix="/api/v1", tags=["chat"])
 app.include_router(sync.router, prefix="/api/v1", tags=["sync"])
 app.include_router(push.router, prefix="/api/v1", tags=["push"])
+app.include_router(community.router, prefix="/api/v1", tags=["community"])
+
+# Mount static files for uploaded images
+static_dir = Path("static")
+static_dir.mkdir(exist_ok=True)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/")
 @limiter.limit("30/minute")

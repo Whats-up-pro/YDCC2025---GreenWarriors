@@ -17,3 +17,40 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     response: str
     timestamp: datetime = Field(default_factory=datetime.utcnow)
+
+# Community Schemas
+class UserProfileResponse(BaseModel):
+    id: int
+    name: str
+    avatar_url: Optional[str] = None
+    bio: Optional[str] = None
+    created_at: datetime
+
+class PostCreate(BaseModel):
+    caption: Optional[str] = Field(None, max_length=2000)
+
+class PostResponse(BaseModel):
+    id: int
+    user: UserProfileResponse
+    image_url: str
+    caption: Optional[str] = None
+    likes_count: int
+    comments_count: int
+    is_liked: bool
+    created_at: datetime
+
+class CommentCreate(BaseModel):
+    content: str = Field(..., min_length=1, max_length=1000)
+
+class CommentResponse(BaseModel):
+    id: int
+    user: UserProfileResponse
+    content: str
+    created_at: datetime
+
+class PostListResponse(BaseModel):
+    posts: list[PostResponse]
+    total: int
+    page: int
+    limit: int
+    has_more: bool

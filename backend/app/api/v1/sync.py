@@ -10,7 +10,6 @@ import logging
 import json
 
 from app.models.database import SessionLocal, DetectionLog, User
-from app.services.n8n_client import trigger_detection_notification
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -105,17 +104,6 @@ async def sync_detection(
         db.refresh(detection)
         
         logger.info(f"✅ Synced detection {detection.id} from client {client_id}: {label} ({confidence:.2f})")
-        
-        # Trigger n8n notification nếu phát hiện WSD với confidence cao
-        if label == "WSD" and confidence > 0.7:
-            background_tasks.add_task(
-                trigger_detection_notification,
-                user_id=user.id,
-                detection_id=detection.id,
-                label=label,
-                confidence=confidence
-            )
-            logger.info(f"🔔 Triggered notification for WSD detection {detection.id}")
         
         return JSONResponse({
             "status": "success",

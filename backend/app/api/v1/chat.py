@@ -1,7 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends, Request
 from app.models.schemas import ChatRequest, ChatResponse
 from app.models.database import SessionLocal, KnowledgeBase
-from app.services.n8n_client import N8NClient
 from app.core.config import settings
 from app.core.security import verify_api_key
 from sqlalchemy.exc import SQLAlchemyError
@@ -14,8 +13,6 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
-
-n8n_client = N8NClient()
 
 # Configure Gemini AI (optional, falls back to knowledge base if not configured)
 gemini_model = None

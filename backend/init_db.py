@@ -11,7 +11,7 @@ Requirements:
 """
 
 from sqlalchemy import inspect, text
-from app.models.database import Base, engine, SessionLocal
+from app.models.database import Base, engine, SessionLocal, KnowledgeBase, CommunityPost, PostComment, PostLike
 from app.core.config import settings
 import logging
 import sys
@@ -52,6 +52,44 @@ def get_existing_tables():
     return inspector.get_table_names()
 
 
+def migrate_users_table():
+    """Add missing columns to users table if they don't exist."""
+    from sqlalchemy import text
+    db = SessionLocal()
+    try:
+        inspector = inspect(engine)
+        if 'users' not in inspector.get_table_names():
+            return True  # Table doesn't exist, will be created by create_all()
+        
+        columns = {col['name']: col for col in inspector.get_columns('users')}
+        migrations = []
+        
+        # Check and add avatar_path column
+        if 'avatar_path' not in columns:
+            logger.info("Adding avatar_path column to users table...")
+            migrations.append("ALTER TABLE users ADD COLUMN avatar_path VARCHAR(500)")
+        
+        # Check and add bio column
+        if 'bio' not in columns:
+            logger.info("Adding bio column to users table...")
+            migrations.append("ALTER TABLE users ADD COLUMN bio TEXT")
+        
+        if migrations:
+            with db.begin():
+                for migration in migrations:
+                    db.execute(text(migration))
+            logger.info(f"✓ Applied {len(migrations)} migration(s) to users table")
+            return True
+        else:
+            return True  # No migrations needed
+            
+    except Exception as e:
+        logger.error(f"✗ Failed to migrate users table: {str(e)}", exc_info=True)
+        db.rollback()
+        return False
+    finally:
+        db.close()
+
 def create_tables():
     """Create all tables defined in models using transaction."""
     logger.info("Creating database tables...")
@@ -65,6 +103,9 @@ def create_tables():
         # Create all tables in a transaction
         with db.begin():
             Base.metadata.create_all(bind=engine)
+        
+        # Migrate existing tables if needed
+        migrate_users_table()
         
         # Get tables after creation
         new_tables = get_existing_tables()
@@ -98,7 +139,7 @@ def verify_tables():
     """Verify all required tables exist."""
     logger.info("\nVerifying tables...")
     
-    required_tables = ['users', 'detection_logs', 'market_prices', 'knowledge_base']
+    required_tables = ['users', 'detection_logs', 'market_prices', 'knowledge_base', 'community_posts', 'post_comments', 'post_likes']
     existing_tables = get_existing_tables()
     missing_tables = [t for t in required_tables if t not in existing_tables]
     
@@ -111,52 +152,43 @@ def verify_tables():
 
 
 def insert_sample_data():
-    """Insert sample data for testing (optional)."""
-    logger.info("\nInserting sample data...")
+    """Insert sample knowledge base entries."""
     db = SessionLocal()
-    
     try:
-        # Check if knowledge base has data
-        result = db.execute(text("SELECT COUNT(*) FROM knowledge_base"))
-        count = result.fetchone()[0]
+        # Check if data already exists
+        existing = db.query(KnowledgeBase).first()
+        if existing:
+            logger.info("Sample data already exists. Skipping insertion.")
+            return
         
-        if count > 0:
-            logger.info(f"✓ Knowledge base already has {count} entries")
-            return True
+        # Create sample entries as KnowledgeBase objects
+        sample_entries = [
+            KnowledgeBase(
+                title='Bệnh đốm trắng (White Spot Disease - WSD)',
+                content='Bệnh đốm trắng là một trong những bệnh nguy hiểm nhất đối với tôm nuôi. Triệu chứng: xuất hiện các đốm trắng trên vỏ tôm, tôm ngừng ăn, bơi lờ đờ.',
+                category='disease',
+                is_active=True
+            ),
+            KnowledgeBase(
+                title='Cách phòng bệnh cho tôm',
+                content='Thường xuyên kiểm tra chất lượng nước, duy trì mật độ nuôi phù hợp, sử dụng thức ăn chất lượng, vệ sinh ao định kỳ.',
+                category='prevention',
+                is_active=True
+            ),
+            KnowledgeBase(
+                title='Chăm sóc tôm sau khi phát hiện bệnh',
+                content='Cách ly tôm bệnh ngay lập tức, tăng cường sục khí, giảm mật độ nuôi, kiểm tra và điều chỉnh các thông số nước.',
+                category='treatment',
+                is_active=True
+            )
+        ]
         
-        # Insert sample knowledge base entries in transaction
-        with db.begin():
-            sample_data = [
-                {
-                    'title': 'Bệnh đốm trắng (White Spot Disease - WSD)',
-                    'content': 'Bệnh đốm trắng là một trong những bệnh nguy hiểm nhất đối với tôm nuôi. Triệu chứng: xuất hiện các đốm trắng trên vỏ tôm, tôm ngừng ăn, bơi lờ đờ.',
-                    'category': 'disease'
-                },
-                {
-                    'title': 'Cách phòng bệnh cho tôm',
-                    'content': 'Thường xuyên kiểm tra chất lượng nước, duy trì mật độ nuôi phù hợp, sử dụng thức ăn chất lượng, vệ sinh ao định kỳ.',
-                    'category': 'prevention'
-                },
-                {
-                    'title': 'Chăm sóc tôm sau khi phát hiện bệnh',
-                    'content': 'Cách ly tôm bệnh ngay lập tức, tăng cường sục khí, giảm mật độ nuôi, kiểm tra và điều chỉnh các thông số nước.',
-                    'category': 'treatment'
-                }
-            ]
-            
-            for data in sample_data:
-                db.execute(text("""
-                    INSERT INTO knowledge_base (title, content, category, is_active, created_at)
-                    VALUES (:title, :content, :category, TRUE, NOW())
-                """), data)
-        
-        logger.info(f"✓ Inserted {len(sample_data)} sample knowledge entries")
-        return True
-        
+        db.add_all(sample_entries)
+        db.commit()
+        logger.info("✓ Inserted sample knowledge base entries")
     except Exception as e:
-        logger.error(f"✗ Failed to insert sample data: {str(e)}", exc_info=True)
+        logger.error(f"✗ Failed to insert sample data: {e}", exc_info=True)
         db.rollback()
-        return False
     finally:
         db.close()
 

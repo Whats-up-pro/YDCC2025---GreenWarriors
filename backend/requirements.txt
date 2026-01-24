@@ -16,7 +16,7 @@ psycopg[binary]>=3.1.0
 httpx==0.28.1
 
 # AI/ML - PyTorch
-torch==2.9.1
+# torch==2.9.1
 torchvision>=0.21.0
 pillow==11.3.0
 
@@ -24,12 +24,10 @@ pillow==11.3.0
 slowapi==0.1.9
 
 # File Validation
-python-magic-bin==0.4.14  # Windows-compatible version with bundled libmagic
+python-magic>=0.4.27  # Linux version (requires libmagic1 system package)
 
 # AI Integration
 google-genai>=1.0.0  # Gemini API (new package)
-# google-generativeai>=0.3.0  # Deprecated
-# openai==2.8.1  # Replaced with Gemini
 
 # Utilities
 requests==2.32.5

@@ -22,11 +22,6 @@ class Settings(BaseSettings):
     MODEL_DEVICE: str = "cpu"
     MODEL_CONFIDENCE_THRESHOLD: float = 0.7
     
-    N8N_WEBHOOK_URL: Optional[str] = None
-    N8N_TIMEOUT: int = 5
-    N8N_MAX_RETRIES: int = 3
-    N8N_RETRY_DELAY: float = 1.0
-    
     API_KEY: Optional[str] = None
     CORS_ORIGINS: str = ""  # Read from .env, no default
     
