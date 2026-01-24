@@ -31,3 +31,7 @@ google-genai>=1.0.0  # Gemini API (new package)
 
 # Utilities
 requests==2.32.5
+
+ultralytics==8.2.103
+supervision==0.22.0
+opencv-python-headless==4.10.0.84

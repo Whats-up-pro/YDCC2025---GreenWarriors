@@ -11,7 +11,7 @@ ENV/
 *.egg-info/
 dist/
 build/
-
+*.pyc
 # Node
 node_modules/
 npm-debug.log*
