@@ -119,6 +119,29 @@ export const CommunityView = () => {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [caption, setCaption] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const commentInputRef = useRef<HTMLInputElement>(null);
+  const commentModalRef = useRef<HTMLDivElement>(null);
+
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    if (showComments || showCreateModal) {
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = '';
+      };
+    }
+  }, [showComments, showCreateModal]);
+
+  // Auto-focus comment input when modal opens
+  useEffect(() => {
+    if (showComments && commentInputRef.current) {
+      // Small delay to ensure modal is rendered
+      setTimeout(() => {
+        commentInputRef.current?.focus();
+        commentModalRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
+    }
+  }, [showComments]);
 
   // Load comments when opening comments modal
   useEffect(() => {
@@ -437,8 +460,22 @@ export const CommunityView = () => {
 
       {/* Comments Modal */}
       {showComments && selectedPost && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center"
+          onClick={(e) => {
+            // Close modal when clicking outside
+            if (e.target === e.currentTarget) {
+              setShowComments(false);
+              setSelectedPost(null);
+              setComments([]);
+              setNewComment('');
+            }
+          }}
+        >
+          <div 
+            ref={commentModalRef}
+            className="bg-white rounded-t-2xl sm:rounded-2xl max-w-2xl w-full max-h-[85vh] sm:max-h-[90vh] flex flex-col sm:m-4 animate-slide-up"
+          >
             <div className="p-4 border-b border-[var(--color-border-light)] flex items-center justify-between">
               <h3 className="text-lg font-bold text-[var(--color-text)]">Bình luận</h3>
               <button
@@ -499,6 +536,7 @@ export const CommunityView = () => {
             <div className="p-4 border-t border-[var(--color-border-light)]">
               <div className="flex gap-2">
                 <input
+                  ref={commentInputRef}
                   type="text"
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}

@@ -55,12 +55,20 @@ function App() {
 
   return (
     <div className="min-h-screen bg-[var(--color-bg)]">
-      {/* Header */}
+      {/* Header with Background Image */}
       <header 
-        className="gradient-primary safe-top sticky top-0 z-20 shadow-md"
+        className="safe-top sticky top-0 z-20 shadow-md relative overflow-hidden"
         role="banner"
+        style={{
+          backgroundImage: 'url(/header-bg.jpg)',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
       >
-        <div className="container-app py-3 lg:py-4">
+        {/* Overlay để text dễ đọc hơn - không blur để giữ chất lượng hình */}
+        <div className="absolute inset-0 bg-gradient-to-r from-[var(--color-primary-dark)]/70 to-[var(--color-primary)]/50"></div>
+        
+        <div className="container-app py-3 lg:py-4 relative z-10">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 lg:gap-3">
               <div className="w-10 h-10 lg:w-12 lg:h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center text-white text-xl lg:text-2xl shadow-lg">

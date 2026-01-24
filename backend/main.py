@@ -12,8 +12,6 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import logging
 import re
-from fastapi.staticfiles import StaticFiles
-
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -42,24 +40,12 @@ def is_allowed_origin(origin: str) -> bool:
         r"^https?://192\.168\.\d+\.\d+(:\d+)?$",  # Local network IPs
         r"^https?://.*\.devtunnels\.ms$",  # Any DevTunnel subdomain
     ]
-    result = any(re.match(pattern, origin) for pattern in allowed_patterns)
-    # #region agent log
-    import json
-    with open('d:\\YDCC\\code\\.cursor\\debug.log', 'a', encoding='utf-8') as f:
-        f.write(json.dumps({"location":"main.py:40","message":"CORS origin check","data":{"origin":origin,"isAllowed":result},"timestamp":int(__import__('time').time()*1000),"sessionId":"debug-session","runId":"run1","hypothesisId":"B"})+"\n")
-    # #endregion
-    return result
+    return any(re.match(pattern, origin) for pattern in allowed_patterns)
 
 @app.middleware("http")
 async def dynamic_cors_middleware(request: Request, call_next):
     """Custom CORS middleware with wildcard support."""
-    import json
     origin = request.headers.get("origin")
-    
-    # #region agent log
-    with open('d:\\YDCC\\code\\.cursor\\debug.log', 'a', encoding='utf-8') as f:
-        f.write(json.dumps({"location":"main.py:43","message":"CORS middleware entry","data":{"method":request.method,"path":str(request.url.path),"origin":origin},"timestamp":int(__import__('time').time()*1000),"sessionId":"debug-session","runId":"run1","hypothesisId":"B"})+"\n")
-    # #endregion
     
     # Log for debugging
     logger.info(f"Request: {request.method} {request.url.path} from origin: {origin}")
@@ -67,10 +53,6 @@ async def dynamic_cors_middleware(request: Request, call_next):
     # Handle preflight OPTIONS request
     if request.method == "OPTIONS":
         is_allowed = origin and is_allowed_origin(origin)
-        # #region agent log
-        with open('d:\\YDCC\\code\\.cursor\\debug.log', 'a', encoding='utf-8') as f:
-            f.write(json.dumps({"location":"main.py:52","message":"OPTIONS request","data":{"origin":origin,"isAllowed":is_allowed},"timestamp":int(__import__('time').time()*1000),"sessionId":"debug-session","runId":"run1","hypothesisId":"B"})+"\n")
-        # #endregion
         if is_allowed:
             logger.info(f"✅ OPTIONS allowed for origin: {origin}")
             return JSONResponse(
@@ -93,10 +75,6 @@ async def dynamic_cors_middleware(request: Request, call_next):
     
     # Add CORS headers if origin is allowed
     is_allowed = origin and is_allowed_origin(origin)
-    # #region agent log
-    with open('d:\\YDCC\\code\\.cursor\\debug.log', 'a', encoding='utf-8') as f:
-        f.write(json.dumps({"location":"main.py:73","message":"CORS headers added","data":{"origin":origin,"isAllowed":is_allowed,"statusCode":response.status_code},"timestamp":int(__import__('time').time()*1000),"sessionId":"debug-session","runId":"run1","hypothesisId":"B"})+"\n")
-    # #endregion
     if is_allowed:
         response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Credentials"] = "true"
