@@ -1,460 +1,272 @@
-import { useRef, useState, useEffect } from "react";
-import { useAI } from "../hooks/useAI";
-import { dbHelpers } from "../db/database";
-import { aiService } from "../services/aiService";
-
-
-type ResultState = {
-  label: string;
-  confidence: number;
-  source?: "local" | "server";
-} | null;
+import { useRef, useState, useEffect } from 'react';
+import { useAI } from '../hooks/useAI';
+import { dbHelpers } from '../db/database';
+import { aiService } from '../services/aiService';
 
 export const CameraScanner = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const videoInputRef = useRef<HTMLInputElement>(null);
-
-  // Preview dùng chung cho ảnh/video bằng Object URL (nhẹ RAM hơn DataURL)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewType, setPreviewType] = useState<"image" | "video" | null>(null);
-
-  const [result, setResult] = useState<ResultState>(null);
-  const [savedToHistory, setSavedToHistory] = useState(false);
-
-  const { detectDisease, loading, error } = useAI();
-  const [isOnline, setIsOnline] = useState<boolean>(navigator.onLine);
-  const [videoAlert, setVideoAlert] = useState<{
-    level: 1 | 2;
-    reasons: string[];
-    wssvProbMax?: number;
+  const [preview, setPreview] = useState<string | null>(null);
+  const [result, setResult] = useState<{
+    label: string;
+    confidence: number;
+    source?: 'local' | 'server';
   } | null>(null);
+  const [savedToHistory, setSavedToHistory] = useState(false);
+  const { detectDisease, loading, error } = useAI();
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
 
-  // Online/offline listener
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
     return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
     };
   }, []);
 
-  // Cleanup objectURL tránh leak bộ nhớ
-  useEffect(() => {
-    return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-    };
-  }, [previewUrl]);
-
-  const resetFileInputs = () => {
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    if (videoInputRef.current) videoInputRef.current.value = "";
-  };
-
-  const handleReset = () => {
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setPreviewUrl(null);
-    setPreviewType(null);
-    setResult(null);
-    setSavedToHistory(false);
-    resetFileInputs();
-    setVideoAlert(null);
-  };
-
-  const getLabelVietnamese = (label: string) => {
-    // Bạn đang dùng WSSV ở chỗ khác; phần UI cũ check WSD/WSD -> giữ logic gọn:
-    if (label === "WSSV" || label === "WSD") return "Bệnh đốm trắng";
-    if (label === "Unknown") return "Chưa xác định";
-    return "Khỏe mạnh";
-  };
-
-  // =========================
-  // IMAGE FLOW (giữ offline-first cũ)
-  // =========================
-  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setResult(null);
     setSavedToHistory(false);
 
-    // Preview ảnh
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    const url = URL.createObjectURL(file);
-    setPreviewUrl(url);
-    setPreviewType("image");
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
 
     try {
-      // OFFLINE-FIRST: Save to IndexedDB IMMEDIATELY
+      // 🎯 OFFLINE-FIRST: Save to IndexedDB IMMEDIATELY (không chờ server)
       const thumbnailBlob = await aiService.createThumbnail(file);
       const tempId = await dbHelpers.saveDetection(
         file, // Full image Blob
         thumbnailBlob, // Thumbnail Blob
-        "Unknown", // Temporary label
+        'Unknown', // Temporary label
         0, // Temporary confidence
         false, // Local inference = false (pending)
         0 // No processing time yet
       );
       setSavedToHistory(true);
 
-      // Pending UI
+      // Show pending state
       setResult({
-        label: "Đang phân tích...",
+        label: 'Đang phân tích...',
         confidence: 0,
-        source: "local",
+        source: 'local'
       });
 
-      // Try server detection (không block UI)
+      // 🌐 Try server detection (không block UI)
       if (isOnline) {
         try {
           const detectionResult = await detectDisease(file);
-
-          // Update IndexedDB synced
+          
+          // Update IndexedDB với kết quả từ server
           await dbHelpers.markSynced(tempId);
-          // TODO: update label/confidence in db nếu bạn có hàm updateDetection
-
+          // TODO: Add updateDetection method to update label/confidence
+          
           setResult({
             label: detectionResult.label,
             confidence: detectionResult.confidence,
-            source: "server",
+            source: 'server'
           });
         } catch (serverErr) {
-          console.warn("Server detection failed, queued for sync:", serverErr);
+          console.warn('Server detection failed, queued for sync:', serverErr);
           setResult({
-            label: "Chờ đồng bộ",
+            label: 'Chờ đồng bộ',
             confidence: 0,
-            source: "local",
+            source: 'local'
           });
         }
       } else {
+        // Offline: Show queued message
         setResult({
-          label: "Đã lưu - Chờ đồng bộ",
+          label: 'Đã lưu - Chờ đồng bộ',
           confidence: 0,
-          source: "local",
+          source: 'local'
         });
       }
     } catch (err) {
-      console.error("Lỗi lưu ảnh:", err);
+      console.error('Lỗi lưu ảnh:', err);
       setResult({
-        label: "Lỗi",
+        label: 'Lỗi',
         confidence: 0,
-        source: "local",
+        source: 'local'
       });
     }
   };
 
-  // =========================
-  // VIDEO FLOW (upload video)
-  // =========================
-  const handleVideoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
+  const handleReset = () => {
+    setPreview(null);
     setResult(null);
-    setVideoAlert(null);
     setSavedToHistory(false);
-
-    // Preview video
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    const url = URL.createObjectURL(file);
-    setPreviewUrl(url);
-    setPreviewType("video");
-
-    try {
-      // Trạng thái pending
-      setResult({
-        label: "Đang tải video...",
-        confidence: 0,
-        source: "local",
-      });
-
-      // Offline: hiện trạng thái chờ
-      if (!isOnline) {
-        setResult({
-          label: "Đã chọn video - Chờ mạng để upload",
-          confidence: 0,
-          source: "local",
-        });
-        return;
-      }
-
-      // Upload lên server
-      // YÊU CẦU: aiService.uploadVideo(file) phải tồn tại và dùng FormData field "video"
-      const { upload, job, metrics, alerts } = await aiService.uploadVideoAndWaitAlert(file);
-
-      console.log("Uploaded video URL:", upload?.url);
-      console.log("Metrics JSON:", job?.metrics_json_url || upload?.processed?.metrics_json_url);
-      console.log("Alerts:", alerts);
-
-      if (alerts.highestLevel === 2) {
-        // Level 2: WSSV detected
-        setVideoAlert({
-          level: 2,
-          reasons: alerts.reasons,
-          wssvProbMax: metrics?.windows?.slice(-1)?.[0]?.level2?.features?.wssv_prob_max,
-        });
-
-        setResult({
-          label: "WSSV",
-          confidence: Math.max(
-            0,
-            Math.min(1, metrics?.windows?.slice(-1)?.[0]?.level2?.features?.wssv_prob_max ?? 0.95)
-          ),
-          source: "server",
-        });
-      } else if (alerts.highestLevel === 1) {
-        // Level 1: slow swimming
-        setVideoAlert({
-          level: 1,
-          reasons: alerts.reasons,
-        });
-
-        // UI bạn đang dùng label=WSSV để đỏ -> mình giữ theo logic cũ
-        setResult({
-          label: "WSSV",
-          confidence: 0.9,
-          source: "server",
-        });
-      } else {
-        setVideoAlert(null);
-        setResult({
-          label: "Healthy",
-          confidence: 1,
-          source: "server",
-        });
-      }
-
-      setSavedToHistory(true);
-
-      // (tuỳ chọn) log url để test
-      // console.log("Uploaded video URL:", uploadRes?.url);
-    } catch (err: any) {
-      console.error("Upload video lỗi:", err);
-      setResult({
-        label: err?.message || "Lỗi upload video",
-        confidence: 0,
-        source: "local",
-      });
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
+  };
+
+  const getLabelVietnamese = (label: string) => {
+    return label === 'WSSV' ? 'Bệnh đốm trắng' : 'Khỏe mạnh';
   };
 
   return (
     <div className="p-4 safe-bottom">
       {/* Offline Banner */}
       {!isOnline && (
-        <div
-          className="mb-4 p-3 bg-amber-50 border border-amber-200 text-amber-800 text-sm"
-          style={{ borderRadius: "12px" }}
+        <div 
+          className="mb-4 p-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 text-amber-800 text-sm rounded-xl shadow-soft" 
           role="status"
           aria-live="polite"
         >
-          Đang ngoại tuyến — Kết quả sẽ được lưu và đồng bộ sau
+          <div className="flex items-center gap-2">
+            <span className="text-lg">📡</span>
+            <span>Đang ngoại tuyến — Kết quả sẽ được lưu và đồng bộ sau</span>
+          </div>
         </div>
       )}
 
-      {/* INPUT: IMAGE */}
       <input
         ref={fileInputRef}
         type="file"
         accept="image/*"
         capture="environment"
-        onChange={handleImageSelect}
-        className="hidden"
-      />
-
-      {/* INPUT: VIDEO */}
-      <input
-        ref={videoInputRef}
-        type="file"
-        accept="video/*"
-        onChange={handleVideoSelect}
+        onChange={handleFileSelect}
         className="hidden"
       />
 
       {/* Empty State */}
-      {!previewUrl && (
+      {!preview && (
         <div className="py-12 lg:py-20 text-center">
           <div className="mb-6 lg:mb-8">
             <div
-              className="w-20 h-20 lg:w-32 lg:h-32 mx-auto mb-4 lg:mb-6 flex items-center justify-center bg-orange-50 text-[var(--color-shrimp)]"
-              style={{ borderRadius: "20px" }}
+              className="w-24 h-24 lg:w-36 lg:h-36 mx-auto mb-6 lg:mb-8 flex items-center justify-center gradient-accent rounded-3xl shadow-accent"
               role="img"
               aria-label="Biểu tượng máy ảnh"
             >
-              <svg
-                width="40"
-                height="40"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                aria-hidden="true"
-                className="lg:w-16 lg:h-16"
-              >
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" aria-hidden="true" className="lg:w-20 lg:h-20">
                 <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
                 <circle cx="12" cy="13" r="4" />
               </svg>
             </div>
-            <h2 className="text-lg lg:text-2xl font-semibold text-[var(--color-text)] mb-1 lg:mb-2">
-              Chụp ảnh / Upload video để chẩn đoán
+            <h2 className="text-xl lg:text-3xl font-bold text-[var(--color-text)] mb-2 lg:mb-3">
+              Chụp ảnh để chẩn đoán
             </h2>
-            <p className="text-sm lg:text-base text-[var(--color-text-secondary)]">
-              Ảnh: chụp rõ nét vùng nghi ngờ. Video: chọn file video từ máy.
+            <p className="text-sm lg:text-base text-[var(--color-text-secondary)] max-w-md mx-auto">
+              Chụp rõ nét vùng nghi ngờ bệnh trên tôm để AI phân tích
             </p>
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={loading}
-              className="btn btn-primary btn-lg w-full sm:w-auto sm:min-w-[200px] lg:min-w-[280px] lg:text-lg"
-              aria-label="Mở camera để chụp ảnh tôm"
-              aria-busy={loading}
-            >
-              {loading ? "Đang xử lý..." : "Chụp ảnh tôm"}
-            </button>
-
-            <button
-              onClick={() => videoInputRef.current?.click()}
-              disabled={loading}
-              className="btn btn-ghost btn-lg w-full sm:w-auto sm:min-w-[200px] lg:min-w-[280px] lg:text-lg"
-              aria-label="Chọn video để upload"
-              aria-busy={loading}
-            >
-              Upload video
-            </button>
-          </div>
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={loading}
+            className="btn btn-accent btn-lg w-full sm:w-auto sm:min-w-[240px] lg:min-w-[300px] lg:text-lg"
+            aria-label="Mở camera để chụp ảnh tôm"
+            aria-busy={loading}
+          >
+            {loading ? (
+              <span className="flex items-center gap-2">
+                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                Đang xử lý...
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <span className="text-xl">📷</span>
+                Chụp ảnh tôm
+              </span>
+            )}
+          </button>
         </div>
       )}
 
       {/* Preview and Results */}
-      {previewUrl && (
+      {preview && (
         <div className="space-y-4 lg:space-y-6">
-          {/* Preview */}
+          {/* Image */}
           <div className="relative lg:max-w-2xl lg:mx-auto">
-            {previewType === "image" ? (
+            <div className="card-modern overflow-hidden p-2">
               <img
-                src={previewUrl}
+                src={preview}
                 alt="Ảnh tôm đã chụp để phân tích"
-                className="w-full border border-[var(--color-border)]"
-                style={{ borderRadius: "16px" }}
+                className="w-full rounded-xl"
               />
-            ) : (
-              <video
-                src={previewUrl}
-                controls
-                className="w-full border border-[var(--color-border)]"
-                style={{ borderRadius: "16px" }}
-              />
-            )}
-
-            {loading && previewType === "image" && (
+            </div>
+            {loading && (
               <div
-                className="absolute inset-0 bg-black/50 flex items-center justify-center"
-                style={{ borderRadius: "16px" }}
+                className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center rounded-2xl"
                 role="status"
                 aria-live="polite"
                 aria-label="Đang phân tích ảnh"
               >
                 <div className="text-white text-center">
-                  <div className="text-4xl lg:text-6xl mb-2 animate-pulse">⏳</div>
-                  <p className="text-sm lg:text-base font-medium">Đang phân tích...</p>
+                  <div className="w-16 h-16 lg:w-20 lg:h-20 mx-auto mb-4 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <p className="text-base lg:text-lg font-semibold">Đang phân tích...</p>
+                  <p className="text-sm text-white/80 mt-1">Vui lòng đợi trong giây lát</p>
                 </div>
               </div>
             )}
           </div>
 
           {/* Result */}
-          {videoAlert && previewType === "video" && (
-            <div
-              className={`p-4 border text-sm ${
-                videoAlert.level === 2
-                  ? "bg-red-50 border-red-200 text-red-900"
-                  : "bg-amber-50 border-amber-200 text-amber-900"
-              }`}
-              style={{ borderRadius: "12px" }}
-              role="alert"
-              aria-live="assertive"
-            >
-              <p className="font-semibold">
-                {videoAlert.level === 2
-                  ? "🚨 Cảnh báo cấp 2 (đốm trắng)"
-                  : "⚠️ Cảnh báo cấp 1 (tôm lờ đờ)"}
-              </p>
-
-              {videoAlert.level === 2 && typeof (videoAlert as any).wssvProbMax === "number" && (
-                <p className="mt-1">
-                  Xác suất WSSV tối đa: {(((videoAlert as any).wssvProbMax as number) * 100).toFixed(1)}%
-                </p>
-              )}
-
-              <ul className="mt-2 list-disc pl-5">
-                {videoAlert.reasons.map((r, idx) => (
-                  <li key={idx}>{r}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-
           {result && (
             <div
-              className={`p-4 border-l-4 ${
-                result.label === "WSD" || result.label === "WSSV"
-                  ? "bg-red-50 border-red-500"
-                  : "bg-green-50 border-green-500"
+              className={`card-modern p-5 lg:p-6 ${
+                result.label === 'WSD' || result.label === 'Bệnh đốm trắng'
+                  ? 'border-l-4 border-[var(--color-accent)]'
+                  : 'border-l-4 border-[var(--color-success)]'
               }`}
-              style={{ borderRadius: "12px" }}
               role="alert"
               aria-live="assertive"
             >
-              <div className="flex items-start justify-between mb-2">
-                <div>
-                  <p
-                    className={`text-lg font-semibold ${
-                      result.label === "WSD" || result.label === "WSSV"
-                        ? "text-red-700"
-                        : "text-green-700"
-                    }`}
-                  >
-                    {getLabelVietnamese(result.label)}
-                  </p>
-                  <p className="text-sm text-[var(--color-text-secondary)]">
-                    Độ tin cậy: {(result.confidence * 100).toFixed(1)}%
-                  </p>
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className={`text-3xl ${result.label === 'WSD' || result.label === 'Bệnh đốm trắng' ? 'text-[var(--color-accent)]' : 'text-[var(--color-success)]'}`}>
+                      {result.label === 'WSD' || result.label === 'Bệnh đốm trắng' ? '⚠️' : '✅'}
+                    </span>
+                    <div>
+                      <p className={`text-xl lg:text-2xl font-bold ${result.label === 'WSD' || result.label === 'Bệnh đốm trắng' ? 'text-[var(--color-accent)]' : 'text-[var(--color-success)]'}`}>
+                        {getLabelVietnamese(result.label)}
+                      </p>
+                      <p className="text-sm text-[var(--color-text-secondary)] mt-1">
+                        Độ tin cậy: <span className="font-semibold text-[var(--color-text)]">{(result.confidence * 100).toFixed(1)}%</span>
+                      </p>
+                    </div>
+                  </div>
                 </div>
-
-                <span
-                  className={`badge ${
-                    result.label === "WSD" || result.label === "WSSV"
-                      ? "badge-danger"
-                      : "badge-success"
-                  }`}
-                >
-                  {result.label}
+                <span className={`badge ${result.label === 'WSD' || result.label === 'Bệnh đốm trắng' ? 'badge-danger' : 'badge-success'}`}>
+                  {result.label === 'WSD' || result.label === 'Bệnh đốm trắng' ? 'Bệnh' : 'Khỏe'}
                 </span>
               </div>
 
               {/* Confidence bar */}
-              <div className="w-full h-1.5 bg-gray-200 mt-3" style={{ borderRadius: "2px" }}>
+              <div className="w-full h-3 bg-[var(--color-border-light)] rounded-full mt-4 overflow-hidden">
                 <div
-                  className={`h-1.5 ${
-                    result.label === "WSD" || result.label === "WSSV" ? "bg-red-500" : "bg-green-500"
+                  className={`h-full rounded-full transition-all duration-500 ${
+                    result.label === 'WSD' || result.label === 'Bệnh đốm trắng'
+                      ? 'gradient-accent'
+                      : 'bg-gradient-to-r from-[var(--color-success)] to-green-400'
                   }`}
                   style={{
-                    width: `${Math.max(0, Math.min(1, result.confidence)) * 100}%`,
-                    borderRadius: "2px",
+                    width: `${result.confidence * 100}%`,
                   }}
                 />
               </div>
 
               {/* Status */}
-              <div className="flex items-center gap-2 mt-3 text-xs text-[var(--color-text-muted)]">
-                {result.source === "server" && <span className="badge badge-info">Server</span>}
-                {savedToHistory && <span className="badge badge-success">Đã lưu</span>}
-                {previewType === "video" && <span className="badge badge-warning">Video</span>}
+              <div className="flex items-center gap-2 mt-4 text-xs">
+                {result.source === 'server' && (
+                  <span className="badge badge-info flex items-center gap-1">
+                    <span>🌐</span> Server
+                  </span>
+                )}
+                {savedToHistory && (
+                  <span className="badge badge-success flex items-center gap-1">
+                    <span>💾</span> Đã lưu
+                  </span>
+                )}
               </div>
             </div>
           )}
@@ -462,40 +274,43 @@ export const CameraScanner = () => {
           {/* Error */}
           {error && (
             <div
-              className="p-4 bg-red-50 border border-red-200 text-red-700 text-sm"
-              style={{ borderRadius: "12px" }}
+              className="card-modern p-4 bg-red-50 border-l-4 border-[var(--color-danger)]"
               role="alert"
               aria-live="assertive"
             >
-              <p className="font-medium">Lỗi</p>
-              <p className="mt-1">{error}</p>
+              <div className="flex items-start gap-3">
+                <span className="text-2xl">❌</span>
+                <div>
+                  <p className="font-semibold text-[var(--color-danger)]">Lỗi xảy ra</p>
+                  <p className="mt-1 text-sm text-red-700">{error}</p>
+                </div>
+              </div>
             </div>
           )}
 
           {/* Actions */}
           <div className="flex gap-3">
-            <button onClick={handleReset} className="btn btn-ghost flex-1" aria-label="Reset">
-              Làm lại
+            <button 
+              onClick={handleReset} 
+              className="btn btn-secondary flex-1"
+              aria-label="Chụp lại ảnh hiện tại"
+            >
+              <span className="flex items-center gap-2">
+                <span>🔄</span>
+                <span>Chụp lại</span>
+              </span>
             </button>
-
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={loading}
               className="btn btn-primary flex-1"
-              aria-label="Chụp/Chọn ảnh mới"
+              aria-label="Chọn ảnh khác từ thư viện"
               aria-busy={loading}
             >
-              Ảnh mới
-            </button>
-
-            <button
-              onClick={() => videoInputRef.current?.click()}
-              disabled={loading}
-              className="btn btn-ghost flex-1"
-              aria-label="Chọn video mới"
-              aria-busy={loading}
-            >
-              Video mới
+              <span className="flex items-center gap-2">
+                <span>📸</span>
+                <span>Ảnh mới</span>
+              </span>
             </button>
           </div>
         </div>
