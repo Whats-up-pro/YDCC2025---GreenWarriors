@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - All disease detections automatically saved to PostgreSQL
   - Transaction-wrapped database operations for data integrity
   - Detection ID returned in response for tracking
-  - Atomic save before n8n webhook trigger
+  - Atomic save with transaction safety
 
 #### Security Enhancements
 
@@ -135,7 +135,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 4-layer file validation before processing
   - Saves DetectionLog to database in transaction
   - Returns detection result immediately
-  - Triggers n8n webhook in background (non-blocking)
+  - Background processing support for future integrations
 
 - **POST /api/v1/chat**
   - Now requires X-API-Key header (if configured)
@@ -284,6 +284,6 @@ Next planned features (PHASE 1):
 - Basic disease detection with PyTorch model
 - FastAPI backend with simple endpoints
 - React frontend with camera interface
-- n8n integration for logging
+- Database logging for all detections
 - PostgreSQL database
 - Docker deployment

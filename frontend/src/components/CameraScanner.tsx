@@ -1,9 +1,12 @@
-import { useRef, useState, useEffect } from 'react';
+import { useRef, useState, useEffect, lazy, Suspense } from 'react';
 import { useAI } from '../hooks/useAI';
 import { dbHelpers } from '../db/database';
 import { aiService } from '../services/aiService';
 
+const VideoUploadView = lazy(() => import('./VideoUploadView').then(m => ({ default: m.VideoUploadView })));
+
 export const CameraScanner = () => {
+  const [mode, setMode] = useState<'image' | 'video'>('image');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [result, setResult] = useState<{
@@ -114,19 +117,68 @@ export const CameraScanner = () => {
 
   return (
     <div className="p-4 safe-bottom">
-      {/* Offline Banner */}
-      {!isOnline && (
-        <div 
-          className="mb-4 p-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 text-amber-800 text-sm rounded-xl shadow-soft" 
-          role="status"
-          aria-live="polite"
+      {/* Mode Toggle */}
+      <div className="mb-4 flex gap-2 bg-[var(--color-surface-alt)] p-1 rounded-xl">
+        <button
+          onClick={() => setMode('image')}
+          className={`flex-1 py-2 px-4 rounded-lg font-medium transition-all ${
+            mode === 'image'
+              ? 'gradient-primary text-white shadow-primary'
+              : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-primary-light)]'
+          }`}
+          aria-pressed={mode === 'image'}
         >
-          <div className="flex items-center gap-2">
-            <span className="text-lg">📡</span>
-            <span>Đang ngoại tuyến — Kết quả sẽ được lưu và đồng bộ sau</span>
-          </div>
-        </div>
+          <span className="flex items-center justify-center gap-2">
+            <span>📷</span>
+            <span>Ảnh</span>
+          </span>
+        </button>
+        <button
+          onClick={() => setMode('video')}
+          className={`flex-1 py-2 px-4 rounded-lg font-medium transition-all ${
+            mode === 'video'
+              ? 'gradient-primary text-white shadow-primary'
+              : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-primary-light)]'
+          }`}
+          aria-pressed={mode === 'video'}
+        >
+          <span className="flex items-center justify-center gap-2">
+            <span>🎥</span>
+            <span>Video</span>
+          </span>
+        </button>
+      </div>
+
+      {/* Video Mode */}
+      {mode === 'video' && (
+        <Suspense
+          fallback={
+            <div className="flex flex-col items-center justify-center h-64 gap-3" role="status" aria-live="polite">
+              <div className="w-12 h-12 border-4 border-[var(--color-primary-dark)] border-t-transparent rounded-full animate-spin"></div>
+              <p className="text-sm text-[var(--color-text-secondary)]">Đang tải...</p>
+            </div>
+          }
+        >
+          <VideoUploadView />
+        </Suspense>
       )}
+
+      {/* Image Mode */}
+      {mode === 'image' && (
+        <>
+          {/* Offline Banner */}
+          {!isOnline && (
+            <div 
+              className="mb-4 p-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 text-amber-800 text-sm rounded-xl shadow-soft" 
+              role="status"
+              aria-live="polite"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-lg">📡</span>
+                <span>Đang ngoại tuyến — Kết quả sẽ được lưu và đồng bộ sau</span>
+              </div>
+            </div>
+          )}
 
       <input
         ref={fileInputRef}
@@ -314,6 +366,8 @@ export const CameraScanner = () => {
             </button>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );

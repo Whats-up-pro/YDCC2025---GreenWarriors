@@ -1,4 +1,4 @@
-import { detectionAPI } from "./api";
+import { detectionAPI, getApiBaseUrl } from "./api";
 
 type UploadVideoResponse = {
   status: string;
@@ -348,7 +348,8 @@ class AIService {
     const form = new FormData();
     form.append("video", file);
 
-    const res = await fetch("/api/v1/push/upload-video?process=true&async_mode=true", {
+    const apiBaseUrl = getApiBaseUrl();
+    const res = await fetch(`${apiBaseUrl}/api/v1/push/upload-video?process=true&async_mode=true`, {
       method: "POST",
       body: form,
     });
